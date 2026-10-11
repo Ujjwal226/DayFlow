@@ -59,6 +59,7 @@ class EventType(str, enum.Enum):
     created = "created"
     updated = "updated"
     completed = "completed"
+    reopened = "reopened"
     deleted = "deleted"
     rescheduled = "rescheduled"
 

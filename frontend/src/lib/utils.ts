@@ -20,6 +20,21 @@ export function formatDate(dateStr: string): string {
   });
 }
 
+/** Format ISO UTC timestamp to Asia/Kolkata date & time */
+export function formatUTCDateTime(isoStr: string | null | undefined): string {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 /** Format "HH:MM:SS" → "09:00 AM" */
 export function formatTime(timeStr: string | null): string {
   if (!timeStr) return '';
@@ -29,10 +44,26 @@ export function formatTime(timeStr: string | null): string {
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-/** Today's date as "YYYY-MM-DD" */
+/** Today's date in Asia/Kolkata as "YYYY-MM-DD" */
 export function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // Use en-CA locale for ISO standard YYYY-MM-DD with Asia/Kolkata timeZone
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/** Get next or previous date ISO string from given "YYYY-MM-DD" */
+export function shiftDateISO(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  const year = dt.getFullYear();
+  const month = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /** Compare two "YYYY-MM-DD" strings */

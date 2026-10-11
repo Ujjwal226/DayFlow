@@ -13,9 +13,11 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { tasksApi } from '../lib/api';
-import type { Task, TaskCreate, TaskUpdate } from '../types/api';
+import type { Task, TaskCreate, TaskReschedule, TaskUpdate } from '../types/api';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TaskModal } from '../components/tasks/TaskModal';
+import { RescheduleModal } from '../components/tasks/RescheduleModal';
+import { TaskActivityModal } from '../components/tasks/TaskActivityModal';
 import { DeleteConfirmModal } from '../components/tasks/DeleteConfirmModal';
 import { todayISO, formatDate, formatTime, isOverdue, isToday } from '../lib/utils';
 import { toast } from 'sonner';
@@ -30,6 +32,8 @@ export const Dashboard: React.FC = () => {
   // Modals state
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+  const [taskToReschedule, setTaskToReschedule] = useState<Task | null>(null);
+  const [taskForActivity, setTaskForActivity] = useState<Task | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   const fetchTasks = useCallback(async (isRefresh = false) => {
@@ -105,7 +109,10 @@ export const Dashboard: React.FC = () => {
       }
     });
 
-    // Chronological order for today's tasks
+    // Chronological order for today's tasks:
+    // 1. Tasks with start_time sorted ascending
+    // 2. Tasks without start_time (all-day/unscheduled time)
+    // 3. Fallback to id
     todayList.sort((a, b) => {
       if (a.start_time && b.start_time) {
         return a.start_time.localeCompare(b.start_time);
@@ -153,6 +160,17 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleReopenTask = async (id: number) => {
+    try {
+      const updated = await tasksApi.reopen(id);
+      setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      toast.success('Task reopened and returned to pending!');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error reopening task';
+      toast.error(msg);
+    }
+  };
+
   const handleSaveTask = async (data: TaskCreate | TaskUpdate) => {
     if (taskToEdit) {
       const updated = await tasksApi.update(taskToEdit.id, data as TaskUpdate);
@@ -162,6 +180,18 @@ export const Dashboard: React.FC = () => {
       const created = await tasksApi.create(data as TaskCreate);
       setTasks((prev) => [created, ...prev]);
       toast.success('Task created successfully!');
+    }
+  };
+
+  const handleReschedule = async (id: number, payload: TaskReschedule) => {
+    try {
+      const updated = await tasksApi.reschedule(id, payload);
+      setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      toast.success(`Task rescheduled to ${formatDate(payload.scheduled_date)}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to reschedule task';
+      toast.error(msg);
+      throw err;
     }
   };
 
@@ -189,7 +219,7 @@ export const Dashboard: React.FC = () => {
             {greeting}, ready to flow?
           </h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Here is your productivity overview for today.
+            Here is your daily productivity overview and schedule.
           </p>
         </div>
 
@@ -355,15 +385,15 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Today's Tasks Section */}
+      {/* Today's Tasks Timeline Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <h2 className="text-lg font-bold tracking-tight text-[var(--text-primary)]">
-              Today&apos;s Schedule
+              Today&apos;s Schedule & Timeline
             </h2>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-500 border border-violet-500/20">
-              {todayTasks.length}
+              {todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}
             </span>
           </div>
           <Link
@@ -420,11 +450,15 @@ export const Dashboard: React.FC = () => {
                 key={task.id}
                 task={task}
                 onComplete={handleCompleteTask}
+                onReopen={handleReopenTask}
                 onEdit={(t) => {
                   setTaskToEdit(t);
                   setIsTaskModalOpen(true);
                 }}
+                onReschedule={(t) => setTaskToReschedule(t)}
+                onViewActivity={(t) => setTaskForActivity(t)}
                 onDelete={(t) => setTaskToDelete(t)}
+                isUpcomingHighlight={nextUpcomingTask?.id === task.id}
               />
             ))}
           </div>
@@ -440,6 +474,21 @@ export const Dashboard: React.FC = () => {
         }}
         taskToEdit={taskToEdit}
         onSubmit={handleSaveTask}
+      />
+
+      {/* Reschedule Modal */}
+      <RescheduleModal
+        isOpen={!!taskToReschedule}
+        onClose={() => setTaskToReschedule(null)}
+        task={taskToReschedule}
+        onReschedule={handleReschedule}
+      />
+
+      {/* Task Activity Audit Modal */}
+      <TaskActivityModal
+        isOpen={!!taskForActivity}
+        onClose={() => setTaskForActivity(null)}
+        task={taskForActivity}
       />
 
       {/* Delete Confirmation Modal */}

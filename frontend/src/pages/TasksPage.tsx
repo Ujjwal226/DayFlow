@@ -10,10 +10,13 @@ import {
   X,
 } from 'lucide-react';
 import { tasksApi } from '../lib/api';
-import type { Task, TaskCreate, TaskUpdate, TaskStatus, Category, Priority } from '../types/api';
+import type { Task, TaskCreate, TaskReschedule, TaskUpdate, TaskStatus, Category, Priority } from '../types/api';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TaskModal } from '../components/tasks/TaskModal';
+import { RescheduleModal } from '../components/tasks/RescheduleModal';
+import { TaskActivityModal } from '../components/tasks/TaskActivityModal';
 import { DeleteConfirmModal } from '../components/tasks/DeleteConfirmModal';
+import { formatDate } from '../lib/utils';
 import { toast } from 'sonner';
 
 export const TasksPage: React.FC = () => {
@@ -31,6 +34,8 @@ export const TasksPage: React.FC = () => {
   // Modals state
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+  const [taskToReschedule, setTaskToReschedule] = useState<Task | null>(null);
+  const [taskForActivity, setTaskForActivity] = useState<Task | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   const fetchTasks = useCallback(async (isRefresh = false) => {
@@ -103,6 +108,17 @@ export const TasksPage: React.FC = () => {
     }
   };
 
+  const handleReopenTask = async (id: number) => {
+    try {
+      const updated = await tasksApi.reopen(id);
+      setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      toast.success('Task reopened and returned to pending!');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error reopening task';
+      toast.error(msg);
+    }
+  };
+
   const handleSaveTask = async (data: TaskCreate | TaskUpdate) => {
     if (taskToEdit) {
       const updated = await tasksApi.update(taskToEdit.id, data as TaskUpdate);
@@ -112,6 +128,18 @@ export const TasksPage: React.FC = () => {
       const created = await tasksApi.create(data as TaskCreate);
       setTasks((prev) => [created, ...prev]);
       toast.success('Task created successfully!');
+    }
+  };
+
+  const handleReschedule = async (id: number, payload: TaskReschedule) => {
+    try {
+      const updated = await tasksApi.reschedule(id, payload);
+      setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      toast.success(`Task rescheduled to ${formatDate(payload.scheduled_date)}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to reschedule task';
+      toast.error(msg);
+      throw err;
     }
   };
 
@@ -319,10 +347,13 @@ export const TasksPage: React.FC = () => {
               key={task.id}
               task={task}
               onComplete={handleCompleteTask}
+              onReopen={handleReopenTask}
               onEdit={(t) => {
                 setTaskToEdit(t);
                 setIsTaskModalOpen(true);
               }}
+              onReschedule={(t) => setTaskToReschedule(t)}
+              onViewActivity={(t) => setTaskForActivity(t)}
               onDelete={(t) => setTaskToDelete(t)}
             />
           ))
@@ -338,6 +369,21 @@ export const TasksPage: React.FC = () => {
         }}
         taskToEdit={taskToEdit}
         onSubmit={handleSaveTask}
+      />
+
+      {/* Reschedule Modal */}
+      <RescheduleModal
+        isOpen={!!taskToReschedule}
+        onClose={() => setTaskToReschedule(null)}
+        task={taskToReschedule}
+        onReschedule={handleReschedule}
+      />
+
+      {/* Task Activity Audit Modal */}
+      <TaskActivityModal
+        isOpen={!!taskForActivity}
+        onClose={() => setTaskForActivity(null)}
+        task={taskForActivity}
       />
 
       {/* Delete Confirmation Modal */}

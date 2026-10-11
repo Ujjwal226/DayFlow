@@ -8,6 +8,7 @@
 export type Priority = 'low' | 'medium' | 'high';
 export type Category = 'work' | 'personal' | 'learning' | 'health' | 'other';
 export type TaskStatus = 'pending' | 'completed';
+export type EventType = 'created' | 'updated' | 'completed' | 'reopened' | 'deleted' | 'rescheduled';
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,23 @@ export interface TaskUpdate {
   priority?: Priority;
   category?: Category;
   status?: TaskStatus;
+}
+
+/** Mirrors TaskReschedule */
+export interface TaskReschedule {
+  scheduled_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+}
+
+/** Mirrors TaskEventResponse */
+export interface TaskEvent {
+  id: number;
+  task_id: number;
+  event_type: EventType;
+  /** ISO-8601 UTC datetime */
+  event_timestamp: string;
+  details?: Record<string, unknown> | null;
 }
 
 // ─── Response wrappers ────────────────────────────────────────────────────────

@@ -9,8 +9,10 @@ import type {
   MessageResponse,
   Task,
   TaskCreate,
+  TaskEvent,
   TaskFilters,
   TaskListResponse,
+  TaskReschedule,
   TaskUpdate,
 } from '../types/api';
 
@@ -96,6 +98,23 @@ export const tasksApi = {
 
   complete: (id: number): Promise<Task> =>
     request<Task>(`/tasks/${id}/complete`, { method: 'PATCH' }),
+
+  reopen: (id: number): Promise<Task> =>
+    request<Task>(`/tasks/${id}/reopen`, { method: 'PATCH' }),
+
+  reschedule: (id: number, payload: TaskReschedule): Promise<Task> =>
+    request<Task>(`/tasks/${id}/reschedule`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  getHistoryByDate: (targetDate: string, includeDeleted = true): Promise<Task[]> => {
+    const qs = includeDeleted ? '?include_deleted=true' : '?include_deleted=false';
+    return request<Task[]>(`/tasks/history/date/${targetDate}${qs}`);
+  },
+
+  getTaskHistory: (id: number): Promise<TaskEvent[]> =>
+    request<TaskEvent[]>(`/tasks/${id}/history`),
 
   delete: (id: number): Promise<MessageResponse> =>
     request<MessageResponse>(`/tasks/${id}`, { method: 'DELETE' }),

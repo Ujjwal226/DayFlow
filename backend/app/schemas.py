@@ -38,6 +38,15 @@ class TaskStatus(str, Enum):
     completed = "completed"
 
 
+class EventType(str, Enum):
+    created = "created"
+    updated = "updated"
+    completed = "completed"
+    reopened = "reopened"
+    deleted = "deleted"
+    rescheduled = "rescheduled"
+
+
 # --------------------------------------------------------------------------- #
 # Task schemas
 # --------------------------------------------------------------------------- #
@@ -92,6 +101,20 @@ class TaskUpdate(BaseModel):
         return self
 
 
+class TaskReschedule(BaseModel):
+    """Payload for PATCH /tasks/{task_id}/reschedule."""
+    scheduled_date: date = Field(..., description="New local scheduled date")
+    start_time: Optional[time] = Field(None, description="New optional start time")
+    end_time: Optional[time] = Field(None, description="New optional end time")
+
+    @model_validator(mode="after")
+    def _validate_time_range(self) -> "TaskReschedule":
+        if self.start_time and self.end_time:
+            if self.end_time <= self.start_time:
+                raise ValueError("end_time must be after start_time")
+        return self
+
+
 class TaskResponse(TaskBase):
     """Full task representation returned by the API."""
 
@@ -126,7 +149,7 @@ class MessageResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# TaskEvent schema (Stage 1: schema only, no endpoint)
+# TaskEvent schema
 # --------------------------------------------------------------------------- #
 
 class TaskEventResponse(BaseModel):
@@ -137,3 +160,24 @@ class TaskEventResponse(BaseModel):
     event_type: str
     event_timestamp: datetime
     details: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_details(cls, data: Any) -> Any:
+        # If details is stored as a JSON string in DB model, decode it
+        if hasattr(data, "details"):
+            raw_details = getattr(data, "details")
+            if isinstance(raw_details, str):
+                import json
+                try:
+                    setattr(data, "details", json.loads(raw_details))
+                except Exception:
+                    pass
+        elif isinstance(data, dict) and isinstance(data.get("details"), str):
+            import json
+            try:
+                data["details"] = json.loads(data["details"])
+            except Exception:
+                pass
+        return data
+
