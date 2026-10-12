@@ -50,13 +50,13 @@
 
 /* ── Light theme ──────────────────────────────────────────────────────────── */
 .light {
-  --bg-base:     var(--color-light-50);
+  --bg-base:     #f3f4f8;
   --bg-surface:  #ffffff;
-  --bg-elevated: var(--color-light-100);
-  --bg-border:   var(--color-light-200);
-  --text-primary:   var(--color-light-900);
-  --text-secondary: var(--color-light-700);
-  --text-muted:     var(--color-light-300);
+  --bg-elevated: #eef0f7;
+  --bg-border:   #d8dce8;
+  --text-primary:   #1a1b2e;
+  --text-secondary: #4a4d6a;
+  --text-muted:     #9298b8;
   --accent:         var(--color-accent-600);
   --accent-hover:   var(--color-accent-500);
 }
@@ -275,3 +275,30 @@ textarea.input { resize: vertical; min-height: 80px; }
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Skeleton shimmer ─────────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 25%,
+    var(--bg-border)   50%,
+    var(--bg-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Recharts overrides ───────────────────────────────────────────────────── */
+.recharts-tooltip-wrapper { z-index: 30; }
+.recharts-legend-wrapper  { font-size: 0.6875rem; }
+
+/* ── Transition helpers ───────────────────────────────────────────────────── */
+.animate-in.fade-in {
+  animation: fadeIn var(--duration, 0.3s) ease;
+}
+

@@ -103,3 +103,61 @@ export interface TaskFilters {
   skip?: number;
   limit?: number;
 }
+
+// ─── Analytics (Stage 4) ─────────────────────────────────────────────────────
+
+/** Mirrors AnalyticsSummary from schemas.py */
+export interface AnalyticsSummary {
+  total: number;
+  completed: number;
+  pending: number;
+  overdue: number;
+  completion_percentage: number;
+}
+
+/** Mirrors DailyMetric from schemas.py */
+export interface DailyMetric {
+  date: string;        // "YYYY-MM-DD"
+  day_name: string;    // "Mon", "Tue", etc.
+  total: number;
+  completed: number;
+  pending: number;
+  completion_percentage: number;
+}
+
+/** Mirrors HeatmapDay from schemas.py */
+export interface HeatmapDay {
+  date: string;            // "YYYY-MM-DD"
+  completed_count: number;
+  total_scheduled: number;
+  intensity: number;       // 0–4
+}
+
+/** Mirrors CategoryMetric from schemas.py */
+export interface CategoryMetric {
+  category: string;
+  total: number;
+  completed: number;
+  pending: number;
+}
+
+/** Mirrors PriorityMetric from schemas.py */
+export interface PriorityMetric {
+  priority: string;
+  total: number;
+  completed: number;
+  pending: number;
+}
+
+/** Mirrors AnalyticsResponse from schemas.py */
+export interface AnalyticsResponse {
+  timezone: string;
+  reported_at: string;
+  today_date: string;
+  summary: AnalyticsSummary;
+  today: DailyMetric;
+  seven_day_trend: DailyMetric[];
+  heatmap: HeatmapDay[];
+  category_breakdown: CategoryMetric[];
+  priority_breakdown: PriorityMetric[];
+}

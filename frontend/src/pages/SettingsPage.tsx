@@ -200,7 +200,7 @@ export const SettingsPage: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
           <div className="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--bg-border)]">
             <span className="text-[var(--text-secondary)] block">Stage</span>
-            <span className="font-semibold text-[var(--text-primary)] text-sm mt-0.5 block">Stage 2</span>
+            <span className="font-semibold text-[var(--text-primary)] text-sm mt-0.5 block">Stage 4</span>
           </div>
           <div className="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--bg-border)]">
             <span className="text-[var(--text-secondary)] block">Frontend</span>

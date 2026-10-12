@@ -5,6 +5,7 @@
  * All requests go to the FastAPI backend; no data is stored locally.
  */
 import type {
+  AnalyticsResponse,
   HealthResponse,
   MessageResponse,
   Task,
@@ -118,6 +119,14 @@ export const tasksApi = {
 
   delete: (id: number): Promise<MessageResponse> =>
     request<MessageResponse>(`/tasks/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+export const analyticsApi = {
+  /** Fetch comprehensive analytics. heatmap_days controls heatmap window (default 84 = 12 weeks). */
+  get: (days = 84): Promise<AnalyticsResponse> =>
+    request<AnalyticsResponse>(`/analytics?days=${days}`),
 };
 
 export { ApiError };

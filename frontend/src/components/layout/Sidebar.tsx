@@ -10,6 +10,7 @@ import {
   Sun,
   Moon,
   Sparkles,
+  BarChart2,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
@@ -30,10 +31,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { theme, toggleTheme } = useTheme();
 
   const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'My Tasks', path: '/tasks', icon: CheckSquare },
-    { name: 'Task History', path: '/history', icon: History },
-    { name: 'Settings', path: '/settings', icon: Settings },
+    { name: 'Dashboard',    path: '/',          icon: LayoutDashboard },
+    { name: 'My Tasks',     path: '/tasks',      icon: CheckSquare     },
+    { name: 'Analytics',   path: '/analytics',  icon: BarChart2       },
+    { name: 'Task History', path: '/history',    icon: History         },
+    { name: 'Settings',    path: '/settings',   icon: Settings        },
   ];
 
   const handleNavClick = () => {
