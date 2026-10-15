@@ -24,11 +24,14 @@ def _make_engine(url: str):
     """
     Build a SQLAlchemy engine for the given URL.
 
-    For SQLite we:
-    - Enable WAL mode for better concurrent read performance.
-    - Enable foreign-key enforcement (off by default in SQLite).
-    - Ensure the data directory exists before returning the engine.
+    Supports SQLite (local development) and PostgreSQL / Supabase (production).
+    - Automatically normalizes postgres:// to postgresql://.
+    - Configures SQLite WAL mode and foreign-key pragmas.
+    - Configures pool_pre_ping and connection recycling for PostgreSQL / Supabase.
     """
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+
     # Create the data directory if the URL points at a file-based SQLite DB.
     if url.startswith("sqlite:///"):
         db_path_str = url[len("sqlite:///"):]
@@ -37,14 +40,19 @@ def _make_engine(url: str):
             db_path.parent.mkdir(parents=True, exist_ok=True)
 
     connect_args: dict = {}
+    engine_kwargs: dict = {
+        "echo": os.getenv("APP_ENV", "development") == "development",
+    }
+
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
+        engine_kwargs["connect_args"] = connect_args
+    else:
+        # Production PostgreSQL (Supabase / Render)
+        engine_kwargs["pool_pre_ping"] = True
+        engine_kwargs["pool_recycle"] = 300
 
-    engine = create_engine(
-        url,
-        connect_args=connect_args,
-        echo=os.getenv("APP_ENV", "development") == "development",
-    )
+    engine = create_engine(url, **engine_kwargs)
 
     if url.startswith("sqlite"):
         @event.listens_for(engine, "connect")
@@ -74,7 +82,7 @@ def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
-        _engine = _make_engine(settings.database_url)
+        _engine = _make_engine(settings.sync_database_url)
     return _engine
 
 

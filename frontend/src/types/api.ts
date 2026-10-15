@@ -15,6 +15,7 @@ export type EventType = 'created' | 'updated' | 'completed' | 'reopened' | 'dele
 /** Mirrors TaskResponse from schemas.py */
 export interface Task {
   id: number;
+  user_id?: number;
   title: string;
   description: string | null;
   /** ISO date string, e.g. "2026-10-15" */
@@ -161,3 +162,30 @@ export interface AnalyticsResponse {
   category_breakdown: CategoryMetric[];
   priority_breakdown: PriorityMetric[];
 }
+
+// ─── User & Auth (Stage 5) ───────────────────────────────────────────────────
+
+export interface User {
+  id: number;
+  email: string;
+  full_name: string | null;
+  created_at: string;
+}
+
+export interface UserRegister {
+  email: string;
+  password: string;
+  full_name?: string | null;
+}
+
+export interface UserLogin {
+  email: string;
+  password: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+

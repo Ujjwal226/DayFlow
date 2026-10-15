@@ -11,8 +11,10 @@ import {
   Moon,
   Sparkles,
   BarChart2,
+  LogOut,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
 
 interface SidebarProps {
@@ -29,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setMobileOpen,
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { name: 'Dashboard',    path: '/',          icon: LayoutDashboard },
@@ -133,21 +136,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* Footer controls: theme toggle & collapse hint */}
+        {/* Footer controls: user profile, logout & theme toggle */}
         <div className="p-3 border-t border-[var(--bg-border)] space-y-2">
+          {/* User profile info & logout */}
+          {user && (
+            <div
+              className={cn(
+                'flex items-center p-2 rounded-xl bg-[var(--bg-elevated)]/60 border border-[var(--bg-border)]/40',
+                isCollapsed && !mobileOpen ? 'justify-center' : 'justify-between space-x-2'
+              )}
+            >
+              <div
+                className="flex items-center space-x-2.5 overflow-hidden min-w-0"
+                title={user.email}
+              >
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm">
+                  {user.full_name
+                    ? user.full_name.charAt(0).toUpperCase()
+                    : user.email.charAt(0).toUpperCase()}
+                </div>
+                {(!isCollapsed || mobileOpen) && (
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-semibold text-[var(--text-primary)] truncate">
+                      {user.full_name || 'My Account'}
+                    </span>
+                    <span className="text-[11px] text-[var(--text-muted)] truncate">
+                      {user.email}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {(!isCollapsed || mobileOpen) && (
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                  title="Sign out"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {isCollapsed && !mobileOpen && user && (
+            <button
+              type="button"
+              onClick={logout}
+              className="w-full flex items-center justify-center p-2 rounded-xl text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={toggleTheme}
             className={cn(
-              'w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]',
-              isCollapsed && !mobileOpen ? 'justify-center' : 'space-x-3'
+              'w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]',
+              isCollapsed && !mobileOpen ? 'justify-center' : 'space-x-2.5'
             )}
             title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
           >
             {theme === 'dark' ? (
-              <Sun className="w-5 h-5 text-amber-400 shrink-0" />
+              <Sun className="w-4 h-4 text-amber-400 shrink-0" />
             ) : (
-              <Moon className="w-5 h-5 text-indigo-500 shrink-0" />
+              <Moon className="w-4 h-4 text-indigo-500 shrink-0" />
             )}
             {(!isCollapsed || mobileOpen) && (
               <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>

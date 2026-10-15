@@ -65,6 +65,41 @@ class EventType(str, enum.Enum):
 
 
 # --------------------------------------------------------------------------- #
+# User
+# --------------------------------------------------------------------------- #
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    tasks: Mapped[list["Task"]] = relationship(
+        "Task",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    def __repr__(self) -> str:
+        return f"<User id={self.id!r} email={self.email!r}>"
+
+
+# --------------------------------------------------------------------------- #
 # Task
 # --------------------------------------------------------------------------- #
 
@@ -73,6 +108,14 @@ class Task(Base):
 
     # Primary key
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # Ownership
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     # Core fields
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -119,6 +162,9 @@ class Task(Base):
     # History: preserve original planned date for rescheduling tracking
     original_scheduled_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # User relationship
+    user: Mapped["User"] = relationship("User", back_populates="tasks")
+
     # Relationship to history events
     events: Mapped[list["TaskEvent"]] = relationship(
         "TaskEvent",
@@ -128,7 +174,7 @@ class Task(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Task id={self.id!r} title={self.title!r} status={self.status!r}>"
+        return f"<Task id={self.id!r} title={self.title!r} user_id={self.user_id!r} status={self.status!r}>"
 
 
 # --------------------------------------------------------------------------- #

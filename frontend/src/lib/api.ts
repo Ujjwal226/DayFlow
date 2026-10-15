@@ -15,9 +15,26 @@ import type {
   TaskListResponse,
   TaskReschedule,
   TaskUpdate,
+  TokenResponse,
+  User,
+  UserLogin,
+  UserRegister,
 } from '../types/api';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000';
+export const TOKEN_STORAGE_KEY = 'dayflow_token';
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  localStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
 
 // ─── Low-level fetch helper ───────────────────────────────────────────────────
 
@@ -39,9 +56,20 @@ class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${path}`;
+  const token = getAuthToken();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init.headers as Record<string, string>),
+  };
+
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...init.headers },
     ...init,
+    headers,
   });
 
   if (!res.ok) {
@@ -55,6 +83,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       typeof detail === 'object' && detail !== null && 'detail' in detail
         ? String((detail as { detail: unknown }).detail)
         : `HTTP ${res.status}`;
+
+    // If 401 Unauthorized on protected routes, trigger event for auth state
+    if (res.status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/auth/register')) {
+      clearAuthToken();
+      window.dispatchEvent(new Event('dayflow:auth_unauthorized'));
+    }
+
     throw new ApiError(res.status, message, detail);
   }
 
@@ -62,6 +97,27 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const text = await res.text();
   return text ? (JSON.parse(text) as T) : (undefined as unknown as T);
 }
+
+// ─── Authentication ───────────────────────────────────────────────────────────
+
+export const authApi = {
+  register: (payload: UserRegister): Promise<TokenResponse> =>
+    request<TokenResponse>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  login: (payload: UserLogin): Promise<TokenResponse> =>
+    request<TokenResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  me: (): Promise<User> => request<User>('/auth/me'),
+
+  logout: (): Promise<MessageResponse> =>
+    request<MessageResponse>('/auth/logout', { method: 'POST' }),
+};
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 

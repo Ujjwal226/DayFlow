@@ -40,12 +40,52 @@ def _log_event(
 
 
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# User CRUD (Stage 5)
+# --------------------------------------------------------------------------- #
+
+def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
+    """Retrieve a user by case-insensitive email."""
+    stmt = select(models.User).where(models.User.email == email.strip().lower())
+    return db.scalars(stmt).first()
+
+
+def get_user_by_id(db: Session, user_id: int) -> Optional[models.User]:
+    """Retrieve a user by ID."""
+    return db.get(models.User, user_id)
+
+
+def create_user(
+    db: Session,
+    payload: schemas.UserRegister,
+    hashed_password: str,
+) -> models.User:
+    """Create and persist a new user."""
+    user = models.User(
+        email=payload.email.strip().lower(),
+        hashed_password=hashed_password,
+        full_name=payload.full_name.strip() if payload.full_name else None,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+# --------------------------------------------------------------------------- #
 # Task CRUD
 # --------------------------------------------------------------------------- #
 
-def get_task(db: Session, task_id: int, include_deleted: bool = False) -> Optional[models.Task]:
-    """Return a task by ID. If include_deleted is False, excludes soft-deleted tasks."""
+def get_task(
+    db: Session,
+    task_id: int,
+    user_id: Optional[int] = None,
+    include_deleted: bool = False,
+) -> Optional[models.Task]:
+    """Return a task by ID. If user_id is provided, enforces ownership. If include_deleted is False, excludes soft-deleted tasks."""
     stmt = select(models.Task).where(models.Task.id == task_id)
+    if user_id is not None:
+        stmt = stmt.where(models.Task.user_id == user_id)
     if not include_deleted:
         stmt = stmt.where(models.Task.deleted_at.is_(None))
     return db.scalars(stmt).first()
@@ -53,6 +93,7 @@ def get_task(db: Session, task_id: int, include_deleted: bool = False) -> Option
 
 def get_tasks(
     db: Session,
+    user_id: int,
     skip: int = 0,
     limit: int = 100,
     status: Optional[str] = None,
@@ -60,11 +101,14 @@ def get_tasks(
     priority: Optional[str] = None,
 ) -> tuple[List[models.Task], int]:
     """
-    Return a paginated list of non-deleted tasks and the total count.
+    Return a paginated list of non-deleted tasks belonging to user_id and the total count.
 
     Optional filters: status, category, priority.
     """
-    stmt = select(models.Task).where(models.Task.deleted_at.is_(None))
+    stmt = select(models.Task).where(
+        models.Task.user_id == user_id,
+        models.Task.deleted_at.is_(None),
+    )
 
     if status:
         stmt = stmt.where(models.Task.status == status)
@@ -84,11 +128,12 @@ def get_tasks(
     return tasks, total
 
 
-def create_task(db: Session, payload: schemas.TaskCreate) -> models.Task:
-    """Create a new task, preserving original_scheduled_date and logging created event."""
+def create_task(db: Session, payload: schemas.TaskCreate, user_id: int) -> models.Task:
+    """Create a new task for user_id, preserving original_scheduled_date and logging created event."""
     data = payload.model_dump()
     task = models.Task(
         **data,
+        user_id=user_id,
         original_scheduled_date=data["scheduled_date"],
         status=models.TaskStatus.pending.value,
     )
@@ -302,20 +347,22 @@ def get_task_history(db: Session, task_id: int) -> List[models.TaskEvent]:
 def get_tasks_by_date(
     db: Session,
     target_date: date,
+    user_id: int,
     include_deleted: bool = True,
 ) -> List[models.Task]:
     """
-    Retrieve all tasks associated with target_date.
+    Retrieve all tasks belonging to user_id associated with target_date.
     Matches tasks where:
-      - scheduled_date == target_date OR
-      - original_scheduled_date == target_date
+      - (scheduled_date == target_date OR original_scheduled_date == target_date)
+      - AND user_id == user_id
     Ordered chronologically by start_time (nulls last), then id.
     """
     stmt = select(models.Task).where(
+        models.Task.user_id == user_id,
         or_(
             models.Task.scheduled_date == target_date,
             models.Task.original_scheduled_date == target_date,
-        )
+        ),
     )
     if not include_deleted:
         stmt = stmt.where(models.Task.deleted_at.is_(None))
@@ -342,9 +389,9 @@ def _to_kolkata_date(dt: datetime) -> date:
     return dt.astimezone(KOLKATA_TZ).date()
 
 
-def get_analytics(db: Session, days: int = 84) -> dict:
+def get_analytics(db: Session, user_id: int, days: int = 84) -> dict:
     """
-    Compute comprehensive productivity analytics based on real task data.
+    Compute comprehensive productivity analytics based on real task data for user_id.
     Uses Asia/Kolkata timezone for daily reporting boundaries.
     """
     now_kolkata = datetime.now(KOLKATA_TZ)
@@ -352,8 +399,11 @@ def get_analytics(db: Session, days: int = 84) -> dict:
     today_str = today_date.isoformat()
     reported_at = now_kolkata.isoformat()
 
-    # Get all active (non-deleted) tasks
-    stmt = select(models.Task).where(models.Task.deleted_at.is_(None))
+    # Get all active (non-deleted) tasks for this user
+    stmt = select(models.Task).where(
+        models.Task.user_id == user_id,
+        models.Task.deleted_at.is_(None),
+    )
     tasks = list(db.scalars(stmt).all())
 
     # Summary metrics
@@ -419,9 +469,14 @@ def get_analytics(db: Session, days: int = 84) -> dict:
                 c_date = t.scheduled_date
             completed_by_date[c_date] = completed_by_date.get(c_date, 0) + 1
 
-    # Also capture task completion history events for comprehensive history
-    event_stmt = select(models.TaskEvent).where(
-        models.TaskEvent.event_type == models.EventType.completed.value
+    # Also capture task completion history events for comprehensive history belonging to this user
+    event_stmt = (
+        select(models.TaskEvent)
+        .join(models.Task, models.TaskEvent.task_id == models.Task.id)
+        .where(
+            models.Task.user_id == user_id,
+            models.TaskEvent.event_type == models.EventType.completed.value,
+        )
     )
     completed_events = list(db.scalars(event_stmt).all())
     event_completed_by_date: Dict[date, set[int]] = {}

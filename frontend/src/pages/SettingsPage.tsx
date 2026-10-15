@@ -9,14 +9,18 @@ import {
   RefreshCw,
   Sliders,
   ShieldCheck,
+  User as UserIcon,
+  LogOut,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { healthApi } from '../lib/api';
 import type { HealthResponse } from '../types/api';
 import { toast } from 'sonner';
 
 export const SettingsPage: React.FC = () => {
   const { theme, setTheme } = useTheme();
+  const { user, logout } = useAuth();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [checkingHealth, setCheckingHealth] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -183,6 +187,58 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Account & Authentication Section (Stage 5) */}
+      <div className="p-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-border)] shadow-sm space-y-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
+            <UserIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">Account & Authentication</h2>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Manage your personal credentials and session security.
+            </p>
+          </div>
+        </div>
+
+        {user ? (
+          <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--bg-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                {user.full_name
+                  ? user.full_name.charAt(0).toUpperCase()
+                  : user.email.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[var(--text-primary)]">
+                  {user.full_name || 'Personal Account'}
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">{user.email}</p>
+                <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                  Authenticated User #{user.id}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="px-4 py-2 text-xs font-semibold rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 transition-colors flex items-center justify-center space-x-2 shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--text-muted)]">No active user session.</p>
+        )}
+
+        <div className="flex items-center space-x-2 text-xs text-[var(--text-muted)] pt-1">
+          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+          <span>All tasks, calendar events, analytics, and history are private to your user ID.</span>
+        </div>
+      </div>
+
       {/* System Info */}
       <div className="p-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-border)] shadow-sm space-y-4">
         <div className="flex items-center space-x-3">
@@ -200,7 +256,7 @@ export const SettingsPage: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
           <div className="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--bg-border)]">
             <span className="text-[var(--text-secondary)] block">Stage</span>
-            <span className="font-semibold text-[var(--text-primary)] text-sm mt-0.5 block">Stage 4</span>
+            <span className="font-semibold text-[var(--text-primary)] text-sm mt-0.5 block">Stage 5: Multi-User</span>
           </div>
           <div className="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--bg-border)]">
             <span className="text-[var(--text-secondary)] block">Frontend</span>
@@ -212,7 +268,7 @@ export const SettingsPage: React.FC = () => {
           </div>
           <div className="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--bg-border)]">
             <span className="text-[var(--text-secondary)] block">Backend</span>
-            <span className="font-semibold text-[var(--text-primary)] text-sm mt-0.5 block">FastAPI + SQLite</span>
+            <span className="font-semibold text-[var(--text-primary)] text-sm mt-0.5 block">FastAPI + Supabase / PostgreSQL</span>
           </div>
         </div>
       </div>

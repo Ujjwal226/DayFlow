@@ -22,14 +22,20 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app import crud, schemas
+from app import crud, models, schemas
+from app.auth import get_current_user
 from app.database import get_db
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-def _get_task_or_404(task_id: int, db: Session, include_deleted: bool = False) -> "crud.models.Task":
-    task = crud.get_task(db, task_id, include_deleted=include_deleted)
+def _get_task_or_404(
+    task_id: int,
+    user_id: int,
+    db: Session,
+    include_deleted: bool = False,
+) -> models.Task:
+    task = crud.get_task(db, task_id, user_id=user_id, include_deleted=include_deleted)
     if task is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -50,9 +56,10 @@ def _get_task_or_404(task_id: int, db: Session, include_deleted: bool = False) -
 )
 def create_task(
     payload: schemas.TaskCreate,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return crud.create_task(db, payload)
+    return crud.create_task(db, payload, user_id=current_user.id)
 
 
 # --------------------------------------------------------------------------- #
@@ -70,10 +77,12 @@ def list_tasks(
     status: Optional[str] = Query(None, description="Filter by status"),
     category: Optional[str] = Query(None, description="Filter by category"),
     priority: Optional[str] = Query(None, description="Filter by priority"),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     tasks, total = crud.get_tasks(
         db,
+        user_id=current_user.id,
         skip=skip,
         limit=limit,
         status=status,
@@ -95,9 +104,15 @@ def list_tasks(
 def get_tasks_history_by_date(
     target_date: date,
     include_deleted: bool = Query(True, description="Include soft-deleted tasks in historical view"),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return crud.get_tasks_by_date(db, target_date=target_date, include_deleted=include_deleted)
+    return crud.get_tasks_by_date(
+        db,
+        target_date=target_date,
+        user_id=current_user.id,
+        include_deleted=include_deleted,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -112,9 +127,10 @@ def get_tasks_history_by_date(
 def get_task(
     task_id: int,
     include_deleted: bool = Query(False, description="Whether to include soft-deleted task"),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return _get_task_or_404(task_id, db, include_deleted=include_deleted)
+    return _get_task_or_404(task_id, user_id=current_user.id, db=db, include_deleted=include_deleted)
 
 
 # --------------------------------------------------------------------------- #
@@ -129,9 +145,10 @@ def get_task(
 def update_task(
     task_id: int,
     payload: schemas.TaskUpdate,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    task = _get_task_or_404(task_id, db)
+    task = _get_task_or_404(task_id, user_id=current_user.id, db=db)
     return crud.update_task(db, task, payload)
 
 
@@ -144,8 +161,12 @@ def update_task(
     response_model=schemas.TaskResponse,
     summary="Mark a task as completed",
 )
-def complete_task(task_id: int, db: Session = Depends(get_db)):
-    task = _get_task_or_404(task_id, db)
+def complete_task(
+    task_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    task = _get_task_or_404(task_id, user_id=current_user.id, db=db)
     if task.status == "completed":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -163,8 +184,12 @@ def complete_task(task_id: int, db: Session = Depends(get_db)):
     response_model=schemas.TaskResponse,
     summary="Reopen a completed task",
 )
-def reopen_task(task_id: int, db: Session = Depends(get_db)):
-    task = _get_task_or_404(task_id, db)
+def reopen_task(
+    task_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    task = _get_task_or_404(task_id, user_id=current_user.id, db=db)
     if task.status == "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -185,9 +210,10 @@ def reopen_task(task_id: int, db: Session = Depends(get_db)):
 def reschedule_task(
     task_id: int,
     payload: schemas.TaskReschedule,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    task = _get_task_or_404(task_id, db)
+    task = _get_task_or_404(task_id, user_id=current_user.id, db=db)
     return crud.reschedule_task(db, task, payload)
 
 
@@ -200,9 +226,12 @@ def reschedule_task(
     response_model=List[schemas.TaskEventResponse],
     summary="Get activity history log for a task",
 )
-def get_task_history(task_id: int, db: Session = Depends(get_db)):
-    # Task may be soft-deleted, but its history must still be retrievable
-    _get_task_or_404(task_id, db, include_deleted=True)
+def get_task_history(
+    task_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _get_task_or_404(task_id, user_id=current_user.id, db=db, include_deleted=True)
     return crud.get_task_history(db, task_id)
 
 
@@ -215,7 +244,11 @@ def get_task_history(task_id: int, db: Session = Depends(get_db)):
     response_model=schemas.MessageResponse,
     summary="Soft-delete a task",
 )
-def delete_task(task_id: int, db: Session = Depends(get_db)):
-    task = _get_task_or_404(task_id, db)
+def delete_task(
+    task_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    task = _get_task_or_404(task_id, user_id=current_user.id, db=db)
     crud.soft_delete_task(db, task)
     return schemas.MessageResponse(message="Task deleted successfully", task_id=task_id)

@@ -27,15 +27,29 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     database_url: str = "sqlite:///./data/dayflow.db"
 
+    @property
+    def sync_database_url(self) -> str:
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        return url
+
     # ------------------------------------------------------------------ #
     # CORS
     # ------------------------------------------------------------------ #
     # Accept a comma-separated string so the value can live in .env
-    allowed_origins: str = "http://localhost:5173,http://localhost:3000"
+    allowed_origins: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
 
     @property
     def allowed_origins_list(self) -> List[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    # ------------------------------------------------------------------ #
+    # Authentication & Security
+    # ------------------------------------------------------------------ #
+    secret_key: str = "dayflow-stage5-insecure-development-secret-key-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     # ------------------------------------------------------------------ #
     # App environment

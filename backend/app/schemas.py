@@ -121,12 +121,44 @@ class TaskResponse(TaskBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    user_id: Optional[int] = None
     status: TaskStatus
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     original_scheduled_date: Optional[date] = None
+
+
+# --------------------------------------------------------------------------- #
+# User & Auth schemas (Stage 5)
+# --------------------------------------------------------------------------- #
+
+class UserBase(BaseModel):
+    email: str = Field(..., description="User email address")
+    full_name: Optional[str] = Field(None, max_length=255, description="User full name")
+
+
+class UserRegister(UserBase):
+    password: str = Field(..., min_length=6, max_length=128, description="User plaintext password")
+
+
+class UserLogin(BaseModel):
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., description="User plaintext password")
+
+
+class UserResponse(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: datetime
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
 
 
 # --------------------------------------------------------------------------- #
