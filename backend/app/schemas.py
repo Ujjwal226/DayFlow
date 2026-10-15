@@ -181,3 +181,57 @@ class TaskEventResponse(BaseModel):
                 pass
         return data
 
+
+# --------------------------------------------------------------------------- #
+# Analytics schemas (Stage 4)
+# --------------------------------------------------------------------------- #
+
+class AnalyticsSummary(BaseModel):
+    total: int
+    completed: int
+    pending: int
+    overdue: int
+    completion_percentage: float
+
+
+class DailyMetric(BaseModel):
+    date: str
+    day_name: str
+    total: int
+    completed: int
+    pending: int
+    completion_percentage: float
+
+
+class HeatmapDay(BaseModel):
+    date: str
+    completed_count: int
+    total_scheduled: int
+    intensity: int
+
+
+class CategoryMetric(BaseModel):
+    category: str
+    total: int
+    completed: int
+    pending: int
+
+
+class PriorityMetric(BaseModel):
+    priority: str
+    total: int
+    completed: int
+    pending: int
+
+
+class AnalyticsResponse(BaseModel):
+    timezone: str
+    reported_at: str
+    today_date: str
+    summary: AnalyticsSummary
+    today: DailyMetric
+    seven_day_trend: list[DailyMetric]
+    heatmap: list[HeatmapDay]
+    category_breakdown: list[CategoryMetric]
+    priority_breakdown: list[PriorityMetric]
+
