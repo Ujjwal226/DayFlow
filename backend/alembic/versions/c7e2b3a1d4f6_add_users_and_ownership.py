@@ -44,8 +44,10 @@ def upgrade() -> None:
     result = connection.execute(sa.text("SELECT COUNT(*) FROM tasks")).scalar()
     default_user_id = 1
     if result and result > 0:
-        default_email = os.getenv("DEFAULT_USER_EMAIL", "owner@dayflow.app").lower()
-        default_password = os.getenv("DEFAULT_USER_PASSWORD", "DayFlow2026!")
+        # Email and password for the legacy owner account MUST be set as env vars.
+        # No hardcoded fallback is provided; the migration will raise if they are absent.
+        default_email = os.environ["DEFAULT_USER_EMAIL"].strip().lower()
+        default_password = os.environ["DEFAULT_USER_PASSWORD"]
         hashed = bcrypt.hashpw(default_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         now_utc = datetime.now(timezone.utc)
 

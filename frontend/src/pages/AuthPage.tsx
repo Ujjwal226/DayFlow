@@ -8,7 +8,6 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  ShieldCheck,
   CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -68,12 +67,6 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  const handleFillDemo = () => {
-    setEmail('owner@dayflow.app');
-    setPassword('DayFlow2026!');
-    setMode('login');
-    setErrorMsg(null);
-  };
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-[var(--bg-base)]">
@@ -217,17 +210,6 @@ export const AuthPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Demo Credentials Link */}
-          <div className="mt-6 pt-5 border-t border-[var(--bg-border)] flex flex-col items-center">
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="text-xs font-medium text-violet-500 dark:text-violet-400 hover:underline flex items-center space-x-1"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Fill default demo credentials (owner account)</span>
-            </button>
-          </div>
         </div>
 
         {/* Security badge footer */}

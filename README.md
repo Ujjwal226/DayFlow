@@ -58,7 +58,7 @@ DayFlow is a modern, high-performance personal task management application built
 
 3. **Safe Migration of Legacy Data**:
    - Alembic migration `c7e2b3a1d4f6_add_users_and_ownership.py` automatically preserves all pre-existing tasks and history.
-   - If pre-existing tasks exist in the database, they are safely assigned to the primary owner account (`owner@dayflow.app` / `DayFlow2026!`).
+   - If pre-existing tasks exist in the database, they are assigned to a legacy owner account whose email and password you supply via the `DEFAULT_USER_EMAIL` and `DEFAULT_USER_PASSWORD` environment variables **before running `alembic upgrade head`**. No hardcoded fallback credentials exist.
    - New user registrations receive a clean, completely private task space with zero cross-user exposure.
 
 ---

@@ -98,7 +98,7 @@ def default_user(db_session: Session) -> models.User:
     if user is None:
         user = models.User(
             email="testuser@example.com",
-            hashed_password="$2b$12$e7kY7UqZc00N5lGk06RjCe9J2m7E8L2Qd4gJ0qF6yC9DayFlow2026",
+            hashed_password="$2b$12$OkFakeHashForTestFixtureOnlyXXXXXXXXXXXXXXXX",  # not a real credential
             full_name="Default Test User",
         )
         db_session.add(user)

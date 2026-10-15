@@ -262,3 +262,96 @@ class TestCrossUserDataIsolation:
         assert ub_analytics["summary"]["pending"] == 0
         assert ub_analytics["summary"]["completion_percentage"] == 0.0
         assert all(h["completed_count"] == 0 for h in ub_analytics["heatmap"])
+
+
+class TestDemoCredentialRejection:
+    """Verify that removed public demo credentials cannot be used to authenticate.
+
+    These tests guard against accidental re-introduction of hardcoded shortcut
+    credentials (owner@dayflow.app / DayFlow2026!) anywhere in the codebase.
+    The test database is always clean; no such account is seeded by conftest.
+    """
+
+    REMOVED_EMAIL = "owner@dayflow.app"
+    REMOVED_PASSWORD = "DayFlow2026!"
+
+    def test_demo_email_login_rejected(self, unauth_client):
+        """Login with the former demo email must fail – account does not exist in test DB."""
+        resp = _login_user(unauth_client, self.REMOVED_EMAIL, self.REMOVED_PASSWORD)
+        assert resp.status_code == 401, (
+            f"Expected 401 for demo credentials, got {resp.status_code}: {resp.text}"
+        )
+
+    def test_demo_email_wrong_password_rejected(self, unauth_client):
+        """Even if a user with the legacy email exists, the removed password must not work."""
+        # First register with the legacy email using a *different* strong password
+        _register_user(unauth_client, self.REMOVED_EMAIL, "UnrelatedNewPassword#99")
+
+        # The old removed password must still be rejected
+        resp = _login_user(unauth_client, self.REMOVED_EMAIL, self.REMOVED_PASSWORD)
+        assert resp.status_code == 401, (
+            f"Old demo password was accepted – credential hardcoding may have regressed: {resp.text}"
+        )
+
+    def test_demo_credentials_not_auto_populated_in_auth(self, unauth_client):
+        """No backend endpoint should automatically supply the demo credentials.
+
+        Confirms the /auth/login endpoint requires both email AND password in the
+        request body and never injects hardcoded values server-side.
+        """
+        # Empty body
+        resp = unauth_client.post("/auth/login", json={})
+        assert resp.status_code in (400, 422), f"Expected 400/422 for empty login body, got {resp.status_code}"
+
+        # Missing password
+        resp = unauth_client.post("/auth/login", json={"email": "someone@example.com"})
+        assert resp.status_code in (400, 422), f"Expected 400/422 for missing password, got {resp.status_code}"
+
+        # Missing email
+        resp = unauth_client.post("/auth/login", json={"password": "SomePassword123!"})
+        assert resp.status_code in (400, 422), f"Expected 400/422 for missing email, got {resp.status_code}"
+
+
+class TestRegistrationCannotClaimExistingData:
+    """New registrations must not be able to access data belonging to any pre-existing user."""
+
+    def test_new_user_cannot_access_legacy_owner_tasks(self, unauth_client):
+        """Register a brand-new user account with an email that has never existed.
+
+        The new account must start with zero tasks, confirming that registration
+        never inherits tasks from any hypothetical pre-existing owner account.
+        This guards against any form of task assignment at registration time.
+        """
+        # Use a unique email so there is no collision with other test accounts
+        reg = _register_user(unauth_client, "fresh-owner-test@dayflow.app", "BrandNewStrongPass#2026").json()
+        assert "access_token" in reg
+
+        headers = _auth_headers(reg["access_token"])
+        task_list = unauth_client.get("/tasks", headers=headers)
+        assert task_list.status_code == 200
+        assert task_list.json()["total"] == 0, (
+            "Newly registered account should start with 0 tasks; "
+            "legacy task inheritance would be a cross-user data leak."
+        )
+
+    def test_cannot_register_same_email_twice_to_steal_account(self, unauth_client):
+        """Registering an email that already exists must be rejected with 400.
+
+        This prevents a malicious user from 're-registering' an existing account
+        to reset its password or gain access to its data.
+        """
+        original_pw = "OriginalOwnerPassword#1"
+        attacker_pw = "AttackerNewPassword#2"
+
+        # Victim registers first
+        victim_reg = _register_user(unauth_client, "victim@example.com", original_pw)
+        assert victim_reg.status_code == 201
+
+        # Attacker tries to register the same email
+        attacker_reg = _register_user(unauth_client, "victim@example.com", attacker_pw)
+        assert attacker_reg.status_code == 400
+        assert "already exists" in attacker_reg.json()["detail"].lower()
+
+        # Victim's original password still works; attacker's does not
+        assert _login_user(unauth_client, "victim@example.com", original_pw).status_code == 200
+        assert _login_user(unauth_client, "victim@example.com", attacker_pw).status_code == 401
