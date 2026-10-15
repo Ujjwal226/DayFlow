@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.routers import analytics, auth, tasks
 
 settings = get_settings()
+settings.validate_for_production()
 
 app = FastAPI(
     title="DayFlow API",

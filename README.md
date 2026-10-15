@@ -260,24 +260,25 @@ cd backend
 platform win32 -- Python 3.11.0, pytest-8.3.4, pluggy-1.6.0
 rootdir: C:\Projects\DayFlow\backend
 configfile: pyproject.toml
-testpaths: tests
 plugins: anyio-4.7.0, asyncio-0.24.0
-collected 48 items
+collected 58 items
 
-tests\test_health.py .                                                   [  2%]
-tests\test_stage3.py ......                                              [ 14%]
-tests\test_stage4.py ....                                                [ 22%]
-tests\test_stage5.py ...........                                         [ 45%]
-tests\test_tasks.py ..........................                           [100%]
+backend\tests\test_health.py .                                           [  1%]
+backend\tests\test_stage3.py ......                                      [ 12%]
+backend\tests\test_stage4.py ....                                        [ 18%]
+backend\tests\test_stage5.py .....................                       [ 55%]
+backend\tests\test_tasks.py ..........................                   [100%]
 
-============================= 48 passed in 9.88s ==============================
+============================= 58 passed in 13.82s =============================
 ```
 
-### Summary of Stage 5 Verification
+### Summary of Stage 5 & 7 Security Hardening
 - **User Registration**: Verified valid registration, password length validation, duplicate email rejection (case-insensitive).
 - **User Login**: Verified valid login with JWT issuance, invalid password rejection (401), nonexistent email rejection (401).
 - **Password Security**: Verified passwords in database are hashed with bcrypt (`$2b$`) and match `bcrypt.checkpw`.
+- **JWT & Production Secret Enforcement**: Startup rejects empty, short (<32 chars), or development default secret keys when `APP_ENV=production`.
+- **Schema Hardening**: `TaskResponse` schema and frontend `Task` interface omit `user_id` to eliminate internal ID exposure.
 - **Unauthorized Access**: Verified all endpoints (`/tasks`, `/analytics`, `/auth/me`) return `401 Unauthorized` without a token or with an invalid token.
-- **Cross-User Data Isolation**: Verified User B cannot list, retrieve, update, complete, reopen, reschedule, view history of, or delete User A's tasks (all return `404 Not Found`).
+- **Cross-User Data Isolation**: Verified User B cannot list, retrieve, update, complete, reopen, reschedule, view history of, or delete User A's tasks (all return `404 Not Found`), even when requesting soft-deleted items (`include_deleted=true`) or date-filtered history.
 - **Analytics Isolation**: Verified User B's metrics, heatmap, and counts are completely isolated and independent of User A's activity.
 - **Frontend Build**: Verified TypeScript compiler and Vite production bundle build with zero errors.

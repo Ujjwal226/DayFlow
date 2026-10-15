@@ -15,7 +15,6 @@ export type EventType = 'created' | 'updated' | 'completed' | 'reopened' | 'dele
 /** Mirrors TaskResponse from schemas.py */
 export interface Task {
   id: number;
-  user_id?: number;
   title: string;
   description: string | null;
   /** ISO date string, e.g. "2026-10-15" */
