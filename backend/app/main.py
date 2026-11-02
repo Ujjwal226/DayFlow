@@ -16,6 +16,8 @@ logger = logging.getLogger("dayflow.app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting %s in %s mode...", settings.APP_NAME, settings.APP_ENV)
+    # Validate security settings at startup
+    settings.validate_security()
     yield
     logger.info("Shutting down %s...", settings.APP_NAME)
 
@@ -80,4 +82,3 @@ def create_application() -> FastAPI:
 
 
 app = create_application()
-

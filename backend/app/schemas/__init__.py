@@ -1,3 +1,10 @@
+from app.schemas.auth import (
+    MessageResponse,
+    TokenResponse,
+    UserLoginRequest,
+    UserRegisterRequest,
+    UserResponse,
+)
 from app.schemas.health import (
     HealthStatus,
     LivenessResponse,
@@ -10,5 +17,9 @@ __all__ = [
     "LivenessResponse",
     "ReadinessResponse",
     "RootResponse",
+    "MessageResponse",
+    "TokenResponse",
+    "UserLoginRequest",
+    "UserRegisterRequest",
+    "UserResponse",
 ]
-

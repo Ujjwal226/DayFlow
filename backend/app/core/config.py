@@ -29,6 +29,17 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
+    # JWT and Authentication Settings
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Refresh Cookie Settings
+    REFRESH_COOKIE_NAME: str = "dayflow_refresh_token"
+    REFRESH_COOKIE_SECURE: bool = False
+    REFRESH_COOKIE_SAMESITE: str = "lax"
+    REFRESH_COOKIE_PATH: str = "/api/v1/auth"
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
@@ -42,6 +53,14 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
 
+    def validate_security(self) -> None:
+        """Validate security-critical configuration on application startup."""
+        if self.APP_ENV == "production":
+            if self.SECRET_KEY in ("insecure-secret-key-change-me", "replace-this-with-a-secure-random-secret-key-in-production"):
+                raise ValueError("Insecure SECRET_KEY configured in production environment!")
+            if not self.REFRESH_COOKIE_SECURE:
+                raise ValueError("REFRESH_COOKIE_SECURE must be True in production!")
+
 
 settings = Settings()
 
@@ -52,4 +71,3 @@ def setup_logging() -> None:
         level=log_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-
