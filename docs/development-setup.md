@@ -60,11 +60,15 @@ Ensure you have the following installed on your machine:
      ```env
      DATABASE_URL="postgresql+psycopg://postgres:<your_password>@localhost:5432/dayflow_db"
      ```
-5. Run tests:
+5. Apply Alembic database migrations:
+   ```bash
+   alembic upgrade head
+   ```
+6. Run tests:
    ```bash
    pytest
    ```
-6. Start the FastAPI development server:
+7. Start the FastAPI development server:
    ```bash
    uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
    ```
@@ -91,8 +95,9 @@ Ensure you have the following installed on your machine:
      ```env
      VITE_API_BASE_URL="http://localhost:8000"
      ```
-4. Build or typecheck:
+4. Run tests & typecheck:
    ```bash
+   npm test -- --run
    npm run build
    ```
 5. Start the Vite development server:
@@ -100,4 +105,24 @@ Ensure you have the following installed on your machine:
    npm run dev
    ```
    Open your browser at [http://localhost:5173](http://localhost:5173).
+
+---
+
+## 4. End-to-End Workflow Testing
+
+### Registering and Logging In
+1. Navigate to [http://localhost:5173/register](http://localhost:5173/register) and create a user account.
+2. Sign in at [http://localhost:5173/login](http://localhost:5173/login) using your credentials to view the authenticated Dashboard.
+
+### Email Verification with Development Simulator
+1. With `EMAIL_PROVIDER="development"` configured, outgoing transactional emails print to the backend `uvicorn` console.
+2. Look for the `[DEV EMAIL SIMULATOR]` log block containing the verification link:
+   `http://localhost:5173/verify-email?token=<token>`
+3. Open the link to verify your email.
+
+### Testing Password Recovery
+1. Navigate to [http://localhost:5173/forgot-password](http://localhost:5173/forgot-password) and enter your account email.
+2. Check the backend `uvicorn` console for the `[DEV EMAIL SIMULATOR]` password reset email:
+   `http://localhost:5173/reset-password?token=<token>`
+3. Follow the link to submit a new password. Existing active sessions will be invalidated immediately.
 
