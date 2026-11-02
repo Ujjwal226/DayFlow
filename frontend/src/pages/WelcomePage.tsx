@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useHealthCheck } from '../hooks/useHealthCheck';
 import {
   Activity,
@@ -33,20 +34,28 @@ export const WelcomePage: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60 font-mono">
-              Part 1A: Foundation
-            </span>
+          <div className="flex items-center space-x-3">
+            <Link
+              to="/login"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/register"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 transition"
+            >
+              Get Started
+            </Link>
             <button
               onClick={() => refetch()}
               disabled={isLoading}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition flex items-center gap-1.5 text-xs font-medium disabled:opacity-50"
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition flex items-center gap-1.5 text-xs font-medium disabled:opacity-50"
               title="Refresh Health Status"
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`}
               />
-              <span>Refresh</span>
             </button>
           </div>
         </div>
