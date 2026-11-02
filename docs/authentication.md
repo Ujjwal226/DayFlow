@@ -141,3 +141,68 @@ Client                          API Endpoint                           Database 
 | `REFRESH_COOKIE_PATH` | `str` | `/api/v1/auth` | Path restricting cookie transmission |
 | `BACKEND_CORS_ORIGINS` | `list` | `["http://localhost:5173", ...]` | Explicit allowed origins for CORS & CSRF checks |
 
+
+---
+
+## 5. Email Verification & Password Recovery (Implementation 1B.4)
+
+### A. Provider-Independent Architecture
+DayFlow decouples email generation from transmission using the `EmailProvider` interface in `backend/app/services/email_service.py`:
+- **Development**: `DevelopmentEmailProvider` outputs verification and password reset links to console/logs without making external requests.
+- **Production Guard**: Application startup actively verifies `EMAIL_PROVIDER != "development"` when `APP_ENV == "production"`.
+
+### B. Endpoints
+- `POST /api/v1/auth/verify-email`: Accepts `{ "token": "<raw_token>" }`. Validates SHA-256 token hash against `security_tokens` and marks user `is_verified=True`.
+- `POST /api/v1/auth/resend-verification`: Accepts `{ "email": "..." }`. Dispatches a new verification link without leaking account existence.
+- `POST /api/v1/auth/forgot-password`: Accepts `{ "email": "..." }`. Dispatches a password reset link; returns a generic response regardless of whether the email exists.
+- `POST /api/v1/auth/reset-password`: Accepts `{ "token": "...", "new_password": "..." }`. Enforces password rules, hashes via Argon2id, marks token used, and revokes all active refresh-token sessions.
+
+### C. Database Table: `security_tokens`
+- `id` (`UUID`, PK)
+- `user_id` (`UUID`, FK to `users.id` with `ON DELETE CASCADE`)
+- `token_type` (`Enum`: `email_verification`, `password_reset`)
+- `token_hash` (`VARCHAR(64)`, unique index, storing SHA-256 hash)
+- `expires_at` (`TIMESTAMP WITH TIME ZONE`)
+- `created_at` (`TIMESTAMP WITH TIME ZONE`, default `now()`)
+- `used_at` (`TIMESTAMP WITH TIME ZONE`, nullable)
+- `revoked_at` (`TIMESTAMP WITH TIME ZONE`, nullable)
+
+---
+
+## 6. Authentication Email Rate Limiting (Implementation 1B.4.1)
+
+To protect outbound transactional email systems against abuse and deny denial-of-service/enumeration attempts, DayFlow implements database-backed shared rate limiting on:
+- `POST /api/v1/auth/forgot-password`
+- `POST /api/v1/auth/resend-verification`
+
+### A. Design & Mechanics
+1. **Shared PostgreSQL State**: Rather than an ephemeral in-memory dictionary, rate limits are tracked in `rate_limit_records` in PostgreSQL. This coordinates limits across multiple workers/nodes.
+2. **Concurrency Safety**: Queries use PostgreSQL row-level locks (`SELECT ... FOR UPDATE`) and `ON CONFLICT DO NOTHING` on `(action, scope, identifier_hash)` to prevent race conditions from bypassing thresholds.
+3. **Identifier Protection (Zero PII Storage)**: Client IPs and normalized email addresses are salted and hashed with SHA-256 (`hashlib.sha256(f"{salt}:{identifier}".encode("utf-8")).hexdigest()`) before storage.
+4. **Client IP Rate Limit**: Allows a maximum of **3 requests per 15 minutes** per IP. Exceeding this limit immediately raises `429 Too Many Requests` with a standard `Retry-After` header.
+5. **Per-Email Cooldown**: Enforces a **2-minute cooldown window** per normalized email. If multiple requests target the same account within 2 minutes, subsequent email deliveries are silently suppressed while preserving the exact generic success message, denying account existence discovery to attackers.
+6. **Automatic Record Cleanup**: Expired records (`expires_at < current_time`) are pruned automatically during rate limit checks and can be scheduled periodically.
+
+### B. Database Table: `rate_limit_records`
+- `id` (`UUID`, PK)
+- `action` (`VARCHAR(50)`, e.g., `forgot_password`, `resend_verification`)
+- `scope` (`Enum`: `client_ip`, `email`)
+- `identifier_hash` (`VARCHAR(64)`, salted SHA-256 hash)
+- `request_count` (`INTEGER`, counter within the window)
+- `window_start` (`TIMESTAMP WITH TIME ZONE`)
+- `expires_at` (`TIMESTAMP WITH TIME ZONE`, indexed)
+- Unique constraint / index: `uq_rate_limit_action_scope_hash (action, scope, identifier_hash)`
+
+### C. Configuration Settings
+| Setting | Default | Description |
+|---|---|---|
+| `AUTH_EMAIL_RATE_LIMIT_IP_MAX_REQUESTS` | `3` | Max email requests per IP window |
+| `AUTH_EMAIL_RATE_LIMIT_IP_WINDOW_MINUTES` | `15` | IP rate limit window in minutes |
+| `AUTH_EMAIL_COOLDOWN_PER_EMAIL_MINUTES` | `2` | Cooldown period per recipient email address |
+| `RATE_LIMIT_SALT` | `dayflow-rate-limit-salt-change-me` | Secret cryptographic salt for IP and email hashes (min 16 chars in production) |
+| `TRUSTED_PROXIES` | `[]` | List of reverse proxy IPs or CIDRs whose `X-Forwarded-For` headers are trusted |
+
+### D. Security Considerations
+1. **Salt Rotation Impact**: The `RATE_LIMIT_SALT` is combined with client identifiers prior to SHA-256 hashing. **Rotating or changing the salt resets the effective rate-limit identity space**, clearing existing throttles as hashes will change.
+2. **Reverse Proxy & Client IP Trust**: DayFlow refuses to trust arbitrary `X-Forwarded-For` or `X-Real-IP` headers by default. Only connections arriving directly from an IP listed in `TRUSTED_PROXIES` will have their forwarded client headers evaluated; untrusted requests use the direct peer IP (`request.client.host`), preventing header spoofing attacks from bypassing limits.
+3. **Zero Secret Leakage**: `RATE_LIMIT_SALT` is strictly kept in backend environment variables and is never exposed through API responses or logged in application traces. In production, startup fails if `RATE_LIMIT_SALT` is empty, matches development defaults, or is shorter than 16 characters.

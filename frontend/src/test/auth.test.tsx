@@ -17,6 +17,7 @@ const mockAuthContext: AuthContextType = {
   logout: vi.fn(),
   logoutAll: vi.fn(),
   refreshSession: vi.fn(),
+  resendVerification: vi.fn(),
 };
 
 describe('Authentication Components', () => {

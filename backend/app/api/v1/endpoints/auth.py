@@ -2,16 +2,20 @@ from typing import Optional
 from fastapi import APIRouter, Cookie, Depends, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user, validate_csrf_origin
+from app.api.dependencies import get_client_ip, get_current_user, validate_csrf_origin
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
+    ForgotPasswordRequest,
     MessageResponse,
+    ResendVerificationRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserLoginRequest,
     UserRegisterRequest,
     UserResponse,
+    VerifyEmailRequest,
 )
 from app.services.auth_service import AuthService
 
@@ -53,6 +57,64 @@ def register(
 ) -> UserResponse:
     auth_service = AuthService(db)
     return auth_service.register(payload)
+
+
+@router.post(
+    "/verify-email",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Verify user email address using token",
+)
+def verify_email(
+    payload: VerifyEmailRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    auth_service = AuthService(db)
+    return auth_service.verify_email(payload)
+
+
+@router.post(
+    "/resend-verification",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Resend email verification link",
+)
+def resend_verification(
+    payload: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+    client_ip: str = Depends(get_client_ip),
+) -> MessageResponse:
+    auth_service = AuthService(db)
+    return auth_service.resend_verification(payload, client_ip=client_ip)
+
+
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Request a password reset link",
+)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+    client_ip: str = Depends(get_client_ip),
+) -> MessageResponse:
+    auth_service = AuthService(db)
+    return auth_service.forgot_password(payload, client_ip=client_ip)
+
+
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Reset password using valid token",
+)
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    auth_service = AuthService(db)
+    return auth_service.reset_password(payload)
 
 
 @router.post(
@@ -138,4 +200,3 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
     return UserResponse.model_validate(current_user)
-

@@ -40,6 +40,34 @@ class Settings(BaseSettings):
     REFRESH_COOKIE_SAMESITE: str = "lax"
     REFRESH_COOKIE_PATH: str = "/api/v1/auth"
 
+    # Email & Verification Settings
+    EMAIL_PROVIDER: str = "development"  # "development" or "smtp"
+    EMAIL_FROM: str = "noreply@dayflow.app"
+    VERIFICATION_TOKEN_EXPIRE_HOURS: int = 24
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # Rate Limiting Settings for Auth Email Endpoints
+    AUTH_EMAIL_RATE_LIMIT_IP_MAX_REQUESTS: int = 3
+    AUTH_EMAIL_RATE_LIMIT_IP_WINDOW_MINUTES: int = 15
+    AUTH_EMAIL_COOLDOWN_PER_EMAIL_MINUTES: int = 2
+    RATE_LIMIT_SALT: str = "dayflow-rate-limit-salt-change-me"
+
+    # Trusted Proxies (IPs or CIDRs whose X-Forwarded-For headers are trusted)
+    TRUSTED_PROXIES: Union[List[str], str] = []
+
+    @field_validator("TRUSTED_PROXIES", mode="before")
+    @classmethod
+    def assemble_trusted_proxies(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [i.strip() for i in v.split(",") if i.strip()]
+        return v
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
@@ -60,6 +88,15 @@ class Settings(BaseSettings):
                 raise ValueError("Insecure SECRET_KEY configured in production environment!")
             if not self.REFRESH_COOKIE_SECURE:
                 raise ValueError("REFRESH_COOKIE_SECURE must be True in production!")
+            if self.EMAIL_PROVIDER == "development":
+                raise ValueError("Development email provider cannot be used in production environment!")
+            if not self.RATE_LIMIT_SALT or self.RATE_LIMIT_SALT in (
+                "dayflow-rate-limit-salt-change-me",
+                "replace-with-a-secure-salt-for-rate-limiting-in-production",
+            ) or len(self.RATE_LIMIT_SALT.strip()) < 16:
+                raise ValueError(
+                    "Production requires a strong, non-default RATE_LIMIT_SALT (at least 16 characters)!"
+                )
 
 
 settings = Settings()

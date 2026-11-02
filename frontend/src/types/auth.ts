@@ -19,6 +19,23 @@ export interface UserLoginRequest {
   password: string;
 }
 
+export interface VerifyEmailRequest {
+  token: string;
+}
+
+export interface ResendVerificationRequest {
+  email: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  new_password: string;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;
@@ -40,4 +57,5 @@ export interface AuthContextType {
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   refreshSession: () => Promise<boolean>;
+  resendVerification: (email: string) => Promise<string>;
 }

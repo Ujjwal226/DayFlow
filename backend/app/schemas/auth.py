@@ -66,3 +66,49 @@ class MessageResponse(BaseModel):
     status: str = "ok"
     message: str
 
+
+class VerifyEmailRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    token: str = Field(..., min_length=1)
+
+
+class ResendVerificationRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+
+class ForgotPasswordRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+
+class ResetPasswordRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    token: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Za-z]", v):
+            raise ValueError("Password must contain at least one letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        return v

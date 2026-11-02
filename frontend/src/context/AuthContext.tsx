@@ -109,6 +109,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resendVerification = async (email: string): Promise<string> => {
+    const res = await authApi.resendVerification({ email });
+    return res.message;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -121,6 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         logoutAll,
         refreshSession,
+        resendVerification,
       }}
     >
       {children}

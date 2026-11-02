@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import uuid
 from typing import Optional
@@ -106,4 +107,65 @@ def validate_csrf_origin(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cross-site request forgery protection: Origin not allowed.",
         )
+
+
+def _is_ip_in_trusted_proxies(client_ip_str: str) -> bool:
+    """Check if the direct peer IP belongs to configured trusted proxies."""
+    if not settings.TRUSTED_PROXIES:
+        return False
+
+    trusted_list = settings.TRUSTED_PROXIES
+    if isinstance(trusted_list, str):
+        trusted_list = [trusted_list]
+
+    for item in trusted_list:
+        item = item.strip()
+        if not item:
+            continue
+        if item.lower() == client_ip_str.lower():
+            return True
+        try:
+            ip = ipaddress.ip_address(client_ip_str)
+            if "/" in item:
+                if ip in ipaddress.ip_network(item, strict=False):
+                    return True
+            else:
+                if ip == ipaddress.ip_address(item):
+                    return True
+        except ValueError:
+            continue
+    return False
+
+
+def get_client_ip(request: Request) -> str:
+    """
+    Extract client IP address.
+
+    Security Rule:
+    Do not blindly trust arbitrary X-Forwarded-For or X-Real-IP headers.
+    Forwarded headers are ONLY evaluated if the immediate connection (peer) originates
+    from a configured trusted proxy (settings.TRUSTED_PROXIES).
+    Otherwise, the direct peer address (request.client.host) is authoritative.
+    """
+    peer_ip = "127.0.0.1"
+    if request.client and request.client.host:
+        peer_ip = request.client.host.strip()
+
+    # If the direct peer is NOT a trusted proxy, ignore all forwarded headers
+    if not _is_ip_in_trusted_proxies(peer_ip):
+        return peer_ip
+
+    # Peer is a trusted proxy, inspect forwarded headers
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # The leftmost IP is the original client IP
+        client_candidate = forwarded_for.split(",")[0].strip()
+        if client_candidate:
+            return client_candidate
+
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip and real_ip.strip():
+        return real_ip.strip()
+
+    return peer_ip
 

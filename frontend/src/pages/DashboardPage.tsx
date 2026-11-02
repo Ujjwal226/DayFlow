@@ -11,7 +11,23 @@ import {
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
-  const { user, logout, logoutAll, isLoading } = useAuth();
+  const { user, logout, logoutAll, resendVerification, isLoading } = useAuth();
+  const [resendStatus, setResendStatus] = React.useState<string | null>(null);
+  const [isResending, setIsResending] = React.useState<boolean>(false);
+
+  const handleResend = async () => {
+    if (!user?.email) return;
+    setIsResending(true);
+    setResendStatus(null);
+    try {
+      const msg = await resendVerification(user.email);
+      setResendStatus(msg);
+    } catch {
+      setResendStatus('Failed to send verification link.');
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
@@ -65,6 +81,31 @@ export const DashboardPage: React.FC = () => {
             Your DayFlow personal productivity and financial command center.
           </p>
         </div>
+
+        {/* Unverified Email Warning Banner */}
+        {user && !user.is_verified && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold text-sm text-white">Your email address is unverified</div>
+                <div className="text-xs text-amber-300/80 mt-0.5">
+                  Verify your email to secure your account and access full communication features.
+                </div>
+                {resendStatus && (
+                  <div className="text-xs text-emerald-400 font-medium mt-1">{resendStatus}</div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={handleResend}
+              disabled={isResending}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-medium transition shrink-0 disabled:opacity-50"
+            >
+              {isResending ? 'Sending...' : 'Resend Verification Email'}
+            </button>
+          </div>
+        )}
 
         {/* Profile Card */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur shadow-2xl space-y-6">
