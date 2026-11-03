@@ -1,17 +1,23 @@
 import React from 'react';
 import { TaskFilterParams, TaskPriority, TaskStatus } from '../../types/task';
+import { Category } from '../../types/category';
+import { Tag } from '../../types/tag';
 import { Filter, RotateCcw } from 'lucide-react';
 
 interface TaskFiltersProps {
   filters: TaskFilterParams;
   onChange: (newFilters: TaskFilterParams) => void;
   onReset: () => void;
+  categories?: Category[];
+  tags?: Tag[];
 }
 
 export const TaskFilters: React.FC<TaskFiltersProps> = ({
   filters,
   onChange,
   onReset,
+  categories = [],
+  tags = [],
 }) => {
   return (
     <div className="flex flex-wrap items-center gap-2.5 p-3.5 bg-slate-900/60 border border-slate-800 rounded-2xl">
@@ -57,6 +63,50 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
         <option value="HIGH">High</option>
         <option value="URGENT">Urgent</option>
       </select>
+
+      {/* Category Filter */}
+      {categories.length > 0 && (
+        <select
+          value={filters.category_id || ''}
+          onChange={(e) =>
+            onChange({
+              ...filters,
+              category_id: e.target.value || undefined,
+              page: 1,
+            })
+          }
+          className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white text-xs outline-none focus:border-emerald-500 transition"
+        >
+          <option value="">All Categories</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {/* Tag Filter */}
+      {tags.length > 0 && (
+        <select
+          value={filters.tag_id || ''}
+          onChange={(e) =>
+            onChange({
+              ...filters,
+              tag_id: e.target.value || undefined,
+              page: 1,
+            })
+          }
+          className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white text-xs outline-none focus:border-emerald-500 transition"
+        >
+          <option value="">All Tags</option>
+          {tags.map((t) => (
+            <option key={t.id} value={t.id}>
+              #{t.name}
+            </option>
+          ))}
+        </select>
+      )}
 
       {/* Archived Filter */}
       <select
@@ -112,7 +162,7 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
 
         <button
           onClick={onReset}
-          title="Reset all filters"
+          title="Reset filters"
           className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -121,4 +171,3 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
     </div>
   );
 };
-

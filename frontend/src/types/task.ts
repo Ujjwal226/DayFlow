@@ -1,3 +1,7 @@
+import { Category } from './category';
+import { Tag } from './tag';
+import { Subtask, SubtaskProgress } from './subtask';
+
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
@@ -5,6 +9,10 @@ export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export interface Task {
   id: string;
   user_id: string;
+  parent_task_id: string | null;
+  category_id: string | null;
+  category?: Category | null;
+  tags?: Tag[];
   title: string;
   description: string | null;
   status: TaskStatus;
@@ -14,6 +22,8 @@ export interface Task {
   completed_at: string | null;
   is_archived: boolean;
   is_overdue: boolean;
+  progress?: SubtaskProgress;
+  subtasks?: Subtask[];
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +35,8 @@ export interface TaskCreatePayload {
   status?: TaskStatus;
   start_date?: string | null;
   due_date?: string | null;
+  category_id?: string | null;
+  tag_ids?: string[];
 }
 
 export interface TaskUpdatePayload {
@@ -34,6 +46,8 @@ export interface TaskUpdatePayload {
   status?: TaskStatus;
   start_date?: string | null;
   due_date?: string | null;
+  category_id?: string | null;
+  tag_ids?: string[];
 }
 
 export interface TaskListResponse {
@@ -60,10 +74,11 @@ export interface TaskFilterParams {
   search?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  category_id?: string;
+  tag_id?: string;
   due_date_from?: string;
   due_date_to?: string;
   is_archived?: boolean;
   sort_by?: 'created_at' | 'updated_at' | 'due_date' | 'priority' | 'status' | 'title';
   sort_order?: 'asc' | 'desc';
 }
-

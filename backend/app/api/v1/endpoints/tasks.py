@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -11,10 +11,14 @@ from app.models.task import TaskPriority, TaskStatus
 from app.models.user import User
 from app.schemas.auth import MessageResponse
 from app.schemas.task import (
+    SubtaskCreateRequest,
+    SubtaskResponse,
+    TaskCategoryAssignmentRequest,
     TaskCreateRequest,
     TaskListResponse,
     TaskResponse,
     TaskStatisticsResponse,
+    TaskTagsAssignmentRequest,
     TaskUpdateRequest,
 )
 from app.services.task_service import TaskService
@@ -65,6 +69,8 @@ def list_tasks(
     search: Optional[str] = Query(None, description="Search query in title or description"),
     status: Optional[TaskStatus] = Query(None, description="Filter by task status"),
     priority: Optional[TaskPriority] = Query(None, description="Filter by task priority"),
+    category_id: Optional[uuid.UUID] = Query(None, description="Filter by category ID"),
+    tag_id: Optional[uuid.UUID] = Query(None, description="Filter by tag ID"),
     due_date_from: Optional[datetime] = Query(None, description="Filter by minimum due date"),
     due_date_to: Optional[datetime] = Query(None, description="Filter by maximum due date"),
     is_archived: bool = Query(False, description="Filter archived vs active tasks"),
@@ -82,6 +88,8 @@ def list_tasks(
         search=search,
         status_filter=status,
         priority_filter=priority,
+        category_id=category_id,
+        tag_id=tag_id,
         due_date_from=due_date_from,
         due_date_to=due_date_to,
         is_archived=is_archived,
@@ -202,3 +210,73 @@ def restore_task(
     service = TaskService(db)
     return service.restore_task(user_id=current_user.id, task_id=task_id)
 
+
+# ---------------- Category & Tag Assignment Endpoints ----------------
+
+@router.patch(
+    "/{task_id}/category",
+    response_model=TaskResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Assign or remove category for a task",
+)
+def assign_task_category(
+    task_id: uuid.UUID,
+    payload: TaskCategoryAssignmentRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskResponse:
+    """Assign or remove category for task, strictly validating user ownership."""
+    service = TaskService(db)
+    return service.assign_category(user_id=current_user.id, task_id=task_id, payload=payload)
+
+
+@router.put(
+    "/{task_id}/tags",
+    response_model=TaskResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Replace assigned tags for a task",
+)
+def assign_task_tags(
+    task_id: uuid.UUID,
+    payload: TaskTagsAssignmentRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskResponse:
+    """Replace all tags assigned to a task, strictly validating user ownership."""
+    service = TaskService(db)
+    return service.assign_tags(user_id=current_user.id, task_id=task_id, payload=payload)
+
+
+# ---------------- Subtasks Endpoints on Parent Task ----------------
+
+@router.post(
+    "/{task_id}/subtasks",
+    response_model=SubtaskResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a subtask under a parent task",
+)
+def create_subtask(
+    task_id: uuid.UUID,
+    payload: SubtaskCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SubtaskResponse:
+    """Create a subtask under the specified parent task."""
+    service = TaskService(db)
+    return service.create_subtask(parent_task_id=task_id, user_id=current_user.id, payload=payload)
+
+
+@router.get(
+    "/{task_id}/subtasks",
+    response_model=List[SubtaskResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List subtasks under a parent task",
+)
+def list_subtasks(
+    task_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[SubtaskResponse]:
+    """List subtasks belonging to a parent task."""
+    service = TaskService(db)
+    return service.list_subtasks(parent_task_id=task_id, user_id=current_user.id)

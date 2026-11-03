@@ -30,6 +30,20 @@ export const tasksApi = {
     return response.data;
   },
 
+  assignCategory: async (taskId: string, categoryId: string | null): Promise<Task> => {
+    const response = await apiClient.patch<Task>(`/api/v1/tasks/${taskId}/category`, {
+      category_id: categoryId,
+    });
+    return response.data;
+  },
+
+  assignTags: async (taskId: string, tagIds: string[]): Promise<Task> => {
+    const response = await apiClient.put<Task>(`/api/v1/tasks/${taskId}/tags`, {
+      tag_ids: tagIds,
+    });
+    return response.data;
+  },
+
   deleteTask: async (taskId: string): Promise<MessageResponse> => {
     const response = await apiClient.delete<MessageResponse>(`/api/v1/tasks/${taskId}`);
     return response.data;

@@ -2,6 +2,9 @@ import React from 'react';
 import { Task } from '../../types/task';
 import { TaskPriorityBadge } from './TaskPriorityBadge';
 import { TaskStatusBadge } from './TaskStatusBadge';
+import { CategoryBadge } from '../categories/CategoryBadge';
+import { TagBadge } from '../tags/TagBadge';
+import { SubtaskProgress } from './SubtaskProgress';
 import {
   Calendar,
   AlertTriangle,
@@ -53,6 +56,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <TaskStatusBadge status={task.status} />
             <TaskPriorityBadge priority={task.priority} />
+            {task.category && (
+              <CategoryBadge category={task.category} size="sm" />
+            )}
             {task.is_overdue && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
                 <AlertTriangle className="w-3 h-3 text-rose-400" />
@@ -83,6 +89,22 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <p className="mt-1.5 text-xs text-slate-400 line-clamp-2 leading-relaxed break-words">
               {task.description}
             </p>
+          )}
+
+          {/* Tags */}
+          {task.tags && task.tags.length > 0 && (
+            <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+              {task.tags.map((tag) => (
+                <TagBadge key={tag.id} tag={tag} size="sm" />
+              ))}
+            </div>
+          )}
+
+          {/* Subtask Progress bar */}
+          {task.progress && task.progress.total_subtasks > 0 && (
+            <div className="mt-3">
+              <SubtaskProgress progress={task.progress} />
+            </div>
           )}
         </div>
 
@@ -151,4 +173,3 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     </div>
   );
 };
-

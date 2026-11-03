@@ -2,8 +2,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 from sqlalchemy import and_, asc, desc, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
+from app.models.category import Category
+from app.models.tag import Tag, TaskTag
 from app.models.task import Task, TaskPriority, TaskStatus
 
 
@@ -14,10 +16,18 @@ class TaskRepository:
         self.db = db
 
     def get_by_id(self, task_id: uuid.UUID, user_id: uuid.UUID) -> Optional[Task]:
-        """Fetch a single task strictly filtered by task_id and user_id."""
-        stmt = select(Task).where(
-            Task.id == task_id,
-            Task.user_id == user_id,
+        """Fetch a single task strictly filtered by task_id and user_id, loading relations."""
+        stmt = (
+            select(Task)
+            .options(
+                selectinload(Task.category),
+                selectinload(Task.tags),
+                selectinload(Task.subtasks),
+            )
+            .where(
+                Task.id == task_id,
+                Task.user_id == user_id,
+            )
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
@@ -25,6 +35,11 @@ class TaskRepository:
         """Fetch a single task with row-level lock strictly scoped by user_id."""
         stmt = (
             select(Task)
+            .options(
+                selectinload(Task.category),
+                selectinload(Task.tags),
+                selectinload(Task.subtasks),
+            )
             .where(
                 Task.id == task_id,
                 Task.user_id == user_id,
@@ -53,12 +68,30 @@ class TaskRepository:
         self.db.delete(task)
         self.db.commit()
 
+    def list_subtasks(self, parent_task_id: uuid.UUID, user_id: uuid.UUID) -> List[Task]:
+        """List subtasks belonging to a parent task strictly scoped by user_id."""
+        stmt = (
+            select(Task)
+            .options(
+                selectinload(Task.category),
+                selectinload(Task.tags),
+            )
+            .where(
+                Task.parent_task_id == parent_task_id,
+                Task.user_id == user_id,
+            )
+            .order_by(Task.created_at.asc(), Task.id.asc())
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
     def list_tasks(
         self,
         user_id: uuid.UUID,
         search: Optional[str] = None,
         status: Optional[TaskStatus] = None,
         priority: Optional[TaskPriority] = None,
+        category_id: Optional[uuid.UUID] = None,
+        tag_id: Optional[uuid.UUID] = None,
         due_date_from: Optional[datetime] = None,
         due_date_to: Optional[datetime] = None,
         is_archived: bool = False,
@@ -68,13 +101,23 @@ class TaskRepository:
         limit: int = 20,
     ) -> Tuple[List[Task], int]:
         """
-        List paginated tasks strictly scoped to the authenticated user.
-        Supports search, filtering by status, priority, due date range, and archiving.
+        List paginated top-level tasks strictly scoped to the authenticated user.
+        Supports search, filtering by status, priority, category, tag, due date range, and archiving.
+        Excludes subtasks (parent_task_id IS NOT NULL) so they do not clutter top-level task views.
         """
         query = select(Task).where(
             Task.user_id == user_id,
             Task.is_archived == is_archived,
+            Task.parent_task_id.is_(None),  # Top-level tasks only
         )
+
+        # Category filter
+        if category_id:
+            query = query.where(Task.category_id == category_id)
+
+        # Tag filter (join task_tags association table with distinct to prevent duplicates)
+        if tag_id:
+            query = query.join(TaskTag, TaskTag.task_id == Task.id).where(TaskTag.tag_id == tag_id)
 
         # Status filter
         if status:
@@ -101,7 +144,8 @@ class TaskRepository:
             )
 
         # Count total matching records before pagination
-        count_stmt = select(func.count()).select_from(query.subquery())
+        count_subq = query.subquery()
+        count_stmt = select(func.count(func.distinct(count_subq.c.id)))
         total = self.db.execute(count_stmt).scalar() or 0
 
         # Sorting
@@ -121,11 +165,34 @@ class TaskRepository:
         else:
             order_clause = [desc(target_column).nulls_last(), desc(Task.id)]
 
-        query = query.order_by(*order_clause)
-        query = query.offset(offset).limit(limit)
+        query = (
+            query.options(
+                selectinload(Task.category),
+                selectinload(Task.tags),
+                selectinload(Task.subtasks),
+            )
+            .order_by(*order_clause)
+            .offset(offset)
+            .limit(limit)
+        )
 
         items = list(self.db.execute(query).scalars().all())
         return items, total
+
+    def list_tasks_by_category(
+        self,
+        category_id: uuid.UUID,
+        user_id: uuid.UUID,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> Tuple[List[Task], int]:
+        """Fetch tasks belonging to a specific category."""
+        return self.list_tasks(
+            user_id=user_id,
+            category_id=category_id,
+            offset=offset,
+            limit=limit,
+        )
 
     def get_statistics(
         self,
@@ -135,7 +202,7 @@ class TaskRepository:
     ) -> dict:
         """
         Calculate aggregated task statistics strictly scoped to user_id.
-        Excludes archived tasks from active statistics.
+        Excludes archived tasks and subtasks from active statistics.
         Calculates counts using efficient database aggregation functions.
         Upcoming tasks are defined as non-completed, non-cancelled tasks with:
             now <= due_date <= now + upcoming_window_days
@@ -146,10 +213,11 @@ class TaskRepository:
 
         upcoming_cutoff = current_time + timedelta(days=upcoming_window_days)
 
-        # Base filter for active (non-archived) user tasks
+        # Base filter for active (non-archived) user tasks (top-level)
         base_filter = and_(
             Task.user_id == user_id,
             Task.is_archived.is_(False),
+            Task.parent_task_id.is_(None),
         )
 
         # Incomplete filter for overdue and upcoming
@@ -193,4 +261,3 @@ class TaskRepository:
             "overdue": overdue_count,
             "upcoming": upcoming_count,
         }
-

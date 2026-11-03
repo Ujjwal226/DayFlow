@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,6 +36,22 @@ class Task(Base):
         Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
+    )
+
+    # Category relationship (nullable: deleting category sets category_id to NULL)
+    category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Subtask self-referencing relationship (nullable: deleting parent deletes subtasks)
+    parent_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
 
@@ -96,15 +112,32 @@ class Task(Base):
         nullable=False,
     )
 
-    # Relationship to user
+    # Relationships
     user = relationship("User", backref="tasks")
+    category = relationship("Category", back_populates="tasks")
+    tags = relationship("Tag", secondary="task_tags", back_populates="tasks", lazy="selectin")
+
+    # Parent and Subtasks relationships
+    parent_task = relationship(
+        "Task",
+        remote_side=[id],
+        back_populates="subtasks",
+    )
+    subtasks = relationship(
+        "Task",
+        back_populates="parent_task",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="Task.created_at",
+    )
 
     __table_args__ = (
         Index("ix_tasks_user_id_status", "user_id", "status"),
         Index("ix_tasks_user_id_is_archived", "user_id", "is_archived"),
         Index("ix_tasks_user_id_due_date", "user_id", "due_date"),
+        Index("ix_tasks_user_id_category_id", "user_id", "category_id"),
+        Index("ix_tasks_user_id_parent_task_id", "user_id", "parent_task_id"),
     )
 
     def __repr__(self) -> str:
         return f"<Task(id={self.id}, user_id={self.user_id}, title='{self.title[:30]}', status='{self.status}')>"
-

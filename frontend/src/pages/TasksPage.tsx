@@ -8,6 +8,8 @@ import { TaskSearch } from '../components/tasks/TaskSearch';
 import { TaskFilters } from '../components/tasks/TaskFilters';
 import { TaskList } from '../components/tasks/TaskList';
 import { TaskFormModal } from '../components/tasks/TaskForm';
+import { CategoryManager } from '../components/categories/CategoryManager';
+import { TagManager } from '../components/tags/TagManager';
 import {
   Plus,
   ChevronLeft,
@@ -16,6 +18,8 @@ import {
   LayoutDashboard,
   CheckSquare,
   AlertCircle,
+  FolderPlus,
+  Tag,
 } from 'lucide-react';
 
 export const TasksPage: React.FC = () => {
@@ -25,6 +29,8 @@ export const TasksPage: React.FC = () => {
     total,
     totalPages,
     statistics,
+    categories,
+    tags,
     filters,
     setFilters,
     isLoading,
@@ -35,11 +41,17 @@ export const TasksPage: React.FC = () => {
     duplicateTask,
     archiveTask,
     restoreTask,
+    createCategory,
+    deleteCategory,
+    createTag,
+    deleteTag,
   } = useTasks();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
 
   const handleCreateOpen = () => {
     setEditingTask(null);
@@ -122,7 +134,7 @@ export const TasksPage: React.FC = () => {
 
       {/* Main Task Workspace */}
       <main className="max-w-6xl mx-auto px-6 py-8 flex-1 w-full">
-        {/* Header & Create Action */}
+        {/* Header & Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
@@ -136,13 +148,31 @@ export const TasksPage: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={handleCreateOpen}
-            className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create Task</span>
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Categories</span>
+            </button>
+
+            <button
+              onClick={() => setIsTagModalOpen(true)}
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5"
+            >
+              <Tag className="w-3.5 h-3.5 text-teal-400" />
+              <span>Tags</span>
+            </button>
+
+            <button
+              onClick={handleCreateOpen}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Task</span>
+            </button>
+          </div>
         </div>
 
         {/* Global Error Banner */}
@@ -167,6 +197,8 @@ export const TasksPage: React.FC = () => {
 
           <TaskFilters
             filters={filters}
+            categories={categories}
+            tags={tags}
             onChange={(newFilters) => setFilters(newFilters)}
             onReset={() =>
               setFilters({
@@ -229,6 +261,30 @@ export const TasksPage: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleFormSubmit}
         initialTask={editingTask}
+        categories={categories}
+        tags={tags}
+      />
+
+      {/* Category Manager Modal */}
+      <CategoryManager
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={categories}
+        onCreateCategory={async (payload) => {
+          await createCategory(payload);
+        }}
+        onDeleteCategory={deleteCategory}
+      />
+
+      {/* Tag Manager Modal */}
+      <TagManager
+        isOpen={isTagModalOpen}
+        onClose={() => setIsTagModalOpen(false)}
+        tags={tags}
+        onCreateTag={async (payload) => {
+          await createTag(payload);
+        }}
+        onDeleteTag={deleteTag}
       />
 
       {/* Delete Confirmation Dialog */}

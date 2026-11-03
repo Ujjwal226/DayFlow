@@ -1,9 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { tasksApi } from '../api/tasks';
+import { categoriesApi } from '../api/categories';
+import { tagsApi } from '../api/tags';
+import { subtasksApi } from '../api/subtasks';
 import { Task, TaskCreatePayload } from '../types/task';
+import { Category } from '../types/category';
+import { Tag } from '../types/tag';
+import { SubtaskCreatePayload, SubtaskUpdatePayload } from '../types/subtask';
 import { TaskPriorityBadge } from '../components/tasks/TaskPriorityBadge';
 import { TaskStatusBadge } from '../components/tasks/TaskStatusBadge';
+import { CategoryBadge } from '../components/categories/CategoryBadge';
+import { TagBadge } from '../components/tags/TagBadge';
+import { SubtaskProgress } from '../components/tasks/SubtaskProgress';
+import { SubtaskList } from '../components/tasks/SubtaskList';
 import { TaskFormModal } from '../components/tasks/TaskForm';
 import {
   ArrowLeft,
@@ -24,6 +34,8 @@ export const TaskDetailsPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [task, setTask] = useState<Task | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -34,8 +46,14 @@ export const TaskDetailsPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await tasksApi.getTask(taskId);
-      setTask(data);
+      const [taskData, catsData, tagsData] = await Promise.all([
+        tasksApi.getTask(taskId),
+        categoriesApi.listCategories(),
+        tagsApi.listTags(),
+      ]);
+      setTask(taskData);
+      setCategories(catsData);
+      setTags(tagsData);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Task not found.';
       setError(msg);
@@ -81,6 +99,29 @@ export const TaskDetailsPage: React.FC = () => {
       const msg = err instanceof Error ? err.message : 'Failed to delete task.';
       setError(msg);
       setIsDeleting(false);
+    }
+  };
+
+  // Subtasks Handlers
+  const handleCreateSubtask = async (parentTaskId: string, payload: SubtaskCreatePayload) => {
+    await subtasksApi.createSubtask(parentTaskId, payload);
+    const refreshed = await tasksApi.getTask(parentTaskId);
+    setTask(refreshed);
+  };
+
+  const handleUpdateSubtask = async (subtaskId: string, payload: SubtaskUpdatePayload) => {
+    await subtasksApi.updateSubtask(subtaskId, payload);
+    if (task) {
+      const refreshed = await tasksApi.getTask(task.id);
+      setTask(refreshed);
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    await subtasksApi.deleteSubtask(subtaskId);
+    if (task) {
+      const refreshed = await tasksApi.getTask(task.id);
+      setTask(refreshed);
     }
   };
 
@@ -167,12 +208,15 @@ export const TaskDetailsPage: React.FC = () => {
       </header>
 
       {/* Main Task View */}
-      <main className="max-w-4xl mx-auto px-6 py-10 flex-1 w-full">
+      <main className="max-w-4xl mx-auto px-6 py-10 flex-1 w-full space-y-6">
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
           {/* Header Badges */}
           <div className="flex items-center gap-2 mb-4 flex-wrap">
             <TaskStatusBadge status={task.status} />
             <TaskPriorityBadge priority={task.priority} />
+            {task.category && (
+              <CategoryBadge category={task.category} size="md" />
+            )}
             {task.is_overdue && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
                 <AlertTriangle className="w-3 h-3 text-rose-400" />
@@ -190,6 +234,15 @@ export const TaskDetailsPage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight break-words">
             {task.title}
           </h1>
+
+          {/* Tags */}
+          {task.tags && task.tags.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              {task.tags.map((tag) => (
+                <TagBadge key={tag.id} tag={tag} size="md" />
+              ))}
+            </div>
+          )}
 
           {/* Description */}
           <div className="mt-6 pt-6 border-t border-slate-800">
@@ -241,6 +294,28 @@ export const TaskDetailsPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Subtasks Section */}
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-white tracking-tight">Subtasks</h2>
+          </div>
+
+          {/* Subtask Progress indicator */}
+          {task.progress && task.progress.total_subtasks > 0 && (
+            <div className="mb-4">
+              <SubtaskProgress progress={task.progress} />
+            </div>
+          )}
+
+          <SubtaskList
+            parentTaskId={task.id}
+            subtasks={task.subtasks || []}
+            onCreateSubtask={handleCreateSubtask}
+            onUpdateSubtask={handleUpdateSubtask}
+            onDeleteSubtask={handleDeleteSubtask}
+          />
+        </div>
       </main>
 
       {/* Edit Modal */}
@@ -249,6 +324,8 @@ export const TaskDetailsPage: React.FC = () => {
         onClose={() => setIsEditModalOpen(false)}
         onSubmit={handleUpdate}
         initialTask={task}
+        categories={categories}
+        tags={tags}
       />
     </div>
   );
