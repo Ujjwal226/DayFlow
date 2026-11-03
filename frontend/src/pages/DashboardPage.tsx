@@ -1,5 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { tasksApi } from '../api/tasks';
+import { Task, TaskStatistics } from '../types/task';
+import { TaskPriorityBadge } from '../components/tasks/TaskPriorityBadge';
+import { TaskStatusBadge } from '../components/tasks/TaskStatusBadge';
+import { Link } from 'react-router-dom';
 import {
   User as UserIcon,
   Mail,
@@ -8,12 +13,36 @@ import {
   LogOut,
   Layers,
   Sparkles,
+  CheckSquare,
+  ArrowRight,
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout, logoutAll, resendVerification, isLoading } = useAuth();
-  const [resendStatus, setResendStatus] = React.useState<string | null>(null);
-  const [isResending, setIsResending] = React.useState<boolean>(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
+  const [isResending, setIsResending] = useState<boolean>(false);
+
+  const [stats, setStats] = useState<TaskStatistics | null>(null);
+  const [recentTasks, setRecentTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        const [statsData, listData] = await Promise.all([
+          tasksApi.getStatistics(),
+          tasksApi.listTasks({ page: 1, page_size: 5, sort_by: 'updated_at', sort_order: 'desc' }),
+        ]);
+        setStats(statsData);
+        setRecentTasks(listData.items);
+      } catch {
+        // Silently tolerate if statistics/tasks load fails
+      } finally {
+        setTasksLoading(false);
+      }
+    };
+    loadDashboardData();
+  }, []);
 
   const handleResend = async () => {
     if (!user?.email) return;
@@ -34,13 +63,32 @@ export const DashboardPage: React.FC = () => {
       {/* Top Application Bar */}
       <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-bold text-white shadow-lg shadow-emerald-500/20">
-              DF
-            </div>
-            <span className="font-semibold text-lg tracking-tight text-white">
-              DayFlow
-            </span>
+          <div className="flex items-center space-x-6">
+            <Link to="/dashboard" className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-bold text-white shadow-lg shadow-emerald-500/20">
+                DF
+              </div>
+              <span className="font-semibold text-lg tracking-tight text-white">
+                DayFlow
+              </span>
+            </Link>
+
+            <nav className="hidden sm:flex items-center space-x-1">
+              <Link
+                to="/dashboard"
+                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold flex items-center gap-1.5"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Dashboard</span>
+              </Link>
+              <Link
+                to="/tasks"
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>Tasks</span>
+              </Link>
+            </nav>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -157,6 +205,89 @@ export const DashboardPage: React.FC = () => {
             <span>
               Session secured with memory-only JWT access tokens and HttpOnly rotating refresh cookies.
             </span>
+          </div>
+        </div>
+
+        {/* Task Management Overview Section */}
+        <div className="mt-8 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur shadow-2xl">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <CheckSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Tasks Overview</h2>
+                <p className="text-xs text-slate-400">Quick snapshot of your action items</p>
+              </div>
+            </div>
+
+            <Link
+              to="/tasks"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold transition"
+            >
+              <span>Manage Tasks</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span className="text-xs text-slate-400 block mb-1">Active Tasks</span>
+              <span className="text-xl font-bold text-white">{stats ? stats.total : 0}</span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span className="text-xs text-slate-400 block mb-1">Completed</span>
+              <span className="text-xl font-bold text-emerald-400">{stats ? stats.completed : 0}</span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span className="text-xs text-slate-400 block mb-1">Overdue</span>
+              <span className="text-xl font-bold text-rose-400">{stats ? stats.overdue : 0}</span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span className="text-xs text-slate-400 block mb-1">Upcoming</span>
+              <span className="text-xl font-bold text-amber-400">{stats ? stats.upcoming : 0}</span>
+            </div>
+          </div>
+
+          {/* Recent Tasks List */}
+          <div className="mt-6">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Recently Updated Tasks
+            </h3>
+            {tasksLoading ? (
+              <div className="py-6 text-center text-xs text-slate-500">Loading tasks...</div>
+            ) : recentTasks.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                No tasks yet. Create your first task to get started.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {recentTasks.map((t) => (
+                  <Link
+                    key={t.id}
+                    to={`/tasks/${t.id}`}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-slate-800/80 hover:border-slate-700 hover:bg-slate-950 transition group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 pr-3">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${
+                        t.status === 'COMPLETED' ? 'bg-emerald-500' : t.is_overdue ? 'bg-rose-500' : 'bg-slate-500'
+                      }`} />
+                      <span className={`text-xs text-slate-200 group-hover:text-emerald-400 transition truncate ${
+                        t.status === 'COMPLETED' ? 'line-through text-slate-500' : ''
+                      }`}>
+                        {t.title}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <TaskStatusBadge status={t.status} />
+                      <TaskPriorityBadge priority={t.priority} />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </main>
