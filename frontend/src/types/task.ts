@@ -12,6 +12,7 @@ export interface Task {
   parent_task_id: string | null;
   category_id: string | null;
   category?: Category | null;
+  project_id?: string | null;
   tags?: Tag[];
   title: string;
   description: string | null;
@@ -36,6 +37,7 @@ export interface TaskCreatePayload {
   start_date?: string | null;
   due_date?: string | null;
   category_id?: string | null;
+  project_id?: string | null;
   tag_ids?: string[];
 }
 
@@ -47,6 +49,7 @@ export interface TaskUpdatePayload {
   start_date?: string | null;
   due_date?: string | null;
   category_id?: string | null;
+  project_id?: string | null;
   tag_ids?: string[];
 }
 
@@ -75,6 +78,7 @@ export interface TaskFilterParams {
   status?: TaskStatus;
   priority?: TaskPriority;
   category_id?: string;
+  project_id?: string;
   tag_id?: string;
   due_date_from?: string;
   due_date_to?: string;

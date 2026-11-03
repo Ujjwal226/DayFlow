@@ -9,6 +9,8 @@ import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { TasksPage } from '../pages/TasksPage';
 import { TaskDetailsPage } from '../pages/TaskDetailsPage';
+import { ProjectsPage } from '../pages/ProjectsPage';
+import { ProjectDetailsPage } from '../pages/ProjectDetailsPage';
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
 
 export const AppRoutes: React.FC = () => {
@@ -69,6 +71,22 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <TaskDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects"
+        element={
+          <ProtectedRoute>
+            <ProjectsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:id"
+        element={
+          <ProtectedRoute>
+            <ProjectDetailsPage />
           </ProtectedRoute>
         }
       />

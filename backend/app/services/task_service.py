@@ -10,6 +10,7 @@ from app.models.category import Category
 from app.models.tag import Tag
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.repositories.category_repository import CategoryRepository
+from app.repositories.project_repository import ProjectRepository
 from app.repositories.tag_repository import TagRepository
 from app.repositories.task_repository import TaskRepository
 from app.schemas.category import CategoryResponse
@@ -39,6 +40,7 @@ class TaskService:
         self.repo = TaskRepository(db)
         self.cat_repo = CategoryRepository(db)
         self.tag_repo = TagRepository(db)
+        self.proj_repo = ProjectRepository(db)
 
     @staticmethod
     def _is_task_overdue(task: Task, now: Optional[datetime] = None) -> bool:
@@ -115,6 +117,7 @@ class TaskService:
             parent_task_id=task.parent_task_id,
             category_id=task.category_id,
             category=category_resp,
+            project_id=task.project_id,
             tags=tag_resps,
             title=task.title,
             description=task.description,
@@ -145,6 +148,15 @@ class TaskService:
                     detail="Category not found.",
                 )
 
+        # Verify project ownership if provided
+        if payload.project_id:
+            project = self.proj_repo.get_by_id(payload.project_id, user_id)
+            if not project:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Project not found.",
+                )
+
         # Verify tag ownership if provided
         tags = []
         if payload.tag_ids:
@@ -158,6 +170,7 @@ class TaskService:
         task = Task(
             user_id=user_id,
             category_id=payload.category_id,
+            project_id=payload.project_id,
             title=payload.title,
             description=payload.description,
             status=payload.status,
@@ -221,6 +234,17 @@ class TaskService:
                         detail="Category not found.",
                     )
             task.category_id = payload.category_id
+
+        # Validate project ownership if updating project
+        if "project_id" in payload.model_fields_set:
+            if payload.project_id is not None:
+                project = self.proj_repo.get_by_id(payload.project_id, user_id)
+                if not project:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Project not found.",
+                    )
+            task.project_id = payload.project_id
 
         # Validate tag ownership if updating tags
         if "tag_ids" in payload.model_fields_set and payload.tag_ids is not None:
@@ -344,6 +368,7 @@ class TaskService:
         new_task = Task(
             user_id=user_id,
             category_id=source.category_id,
+            project_id=source.project_id,
             title=duplicated_title,
             description=source.description,
             status=TaskStatus.TODO,
@@ -392,6 +417,7 @@ class TaskService:
         status_filter: Optional[TaskStatus] = None,
         priority_filter: Optional[TaskPriority] = None,
         category_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None,
         tag_id: Optional[uuid.UUID] = None,
         due_date_from: Optional[datetime] = None,
         due_date_to: Optional[datetime] = None,
@@ -421,6 +447,7 @@ class TaskService:
             status=status_filter,
             priority=priority_filter,
             category_id=category_id,
+            project_id=project_id,
             tag_id=tag_id,
             due_date_from=due_date_from,
             due_date_to=due_date_to,

@@ -4,6 +4,7 @@ from app.services.health_service import HealthService
 from app.services.rate_limit_service import RateLimitService
 from app.services.category_service import CategoryService
 from app.services.tag_service import TagService
+from app.services.project_service import ProjectService
 from app.services.task_service import TaskService
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "RateLimitService",
     "CategoryService",
     "TagService",
+    "ProjectService",
     "TaskService",
 ]

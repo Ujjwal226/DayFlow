@@ -91,6 +91,7 @@ class TaskCreateRequest(BaseModel):
     start_date: Optional[datetime] = Field(None, description="Task start time in UTC")
     due_date: Optional[datetime] = Field(None, description="Task deadline in UTC")
     category_id: Optional[uuid.UUID] = Field(None, description="Optional category UUID")
+    project_id: Optional[uuid.UUID] = Field(None, description="Optional project UUID")
     tag_ids: Optional[List[uuid.UUID]] = Field(default=None, description="Optional list of tag UUIDs")
 
     @field_validator("title")
@@ -128,6 +129,7 @@ class TaskUpdateRequest(BaseModel):
     start_date: Optional[datetime] = Field(None, description="Updated start date")
     due_date: Optional[datetime] = Field(None, description="Updated due date")
     category_id: Optional[uuid.UUID] = Field(None, description="Updated category UUID (set None to remove)")
+    project_id: Optional[uuid.UUID] = Field(None, description="Updated project UUID (set None to remove)")
     tag_ids: Optional[List[uuid.UUID]] = Field(None, description="Updated list of tag UUIDs")
 
     @field_validator("title")
@@ -185,6 +187,7 @@ class TaskResponse(BaseModel):
     parent_task_id: Optional[uuid.UUID] = None
     category_id: Optional[uuid.UUID] = None
     category: Optional[CategoryResponse] = None
+    project_id: Optional[uuid.UUID] = None
     tags: List[TagResponse] = Field(default_factory=list)
     title: str
     description: Optional[str] = None

@@ -47,6 +47,14 @@ class Task(Base):
         index=True,
     )
 
+    # Project relationship (nullable: deleting project sets project_id to NULL)
+    project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Subtask self-referencing relationship (nullable: deleting parent deletes subtasks)
     parent_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(as_uuid=True),
@@ -115,6 +123,7 @@ class Task(Base):
     # Relationships
     user = relationship("User", backref="tasks")
     category = relationship("Category", back_populates="tasks")
+    project = relationship("Project", back_populates="tasks")
     tags = relationship("Tag", secondary="task_tags", back_populates="tasks", lazy="selectin")
 
     # Parent and Subtasks relationships
@@ -136,6 +145,7 @@ class Task(Base):
         Index("ix_tasks_user_id_is_archived", "user_id", "is_archived"),
         Index("ix_tasks_user_id_due_date", "user_id", "due_date"),
         Index("ix_tasks_user_id_category_id", "user_id", "category_id"),
+        Index("ix_tasks_user_id_project_id", "user_id", "project_id"),
         Index("ix_tasks_user_id_parent_task_id", "user_id", "parent_task_id"),
     )
 

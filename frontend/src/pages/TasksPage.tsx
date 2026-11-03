@@ -116,6 +116,12 @@ export const TasksPage: React.FC = () => {
                 <CheckSquare className="w-3.5 h-3.5" />
                 <span>Tasks</span>
               </Link>
+              <Link
+                to="/projects"
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
+              >
+                <span>Projects</span>
+              </Link>
             </nav>
           </div>
 

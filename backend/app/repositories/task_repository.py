@@ -21,6 +21,7 @@ class TaskRepository:
             select(Task)
             .options(
                 selectinload(Task.category),
+                selectinload(Task.project),
                 selectinload(Task.tags),
                 selectinload(Task.subtasks),
             )
@@ -37,6 +38,7 @@ class TaskRepository:
             select(Task)
             .options(
                 selectinload(Task.category),
+                selectinload(Task.project),
                 selectinload(Task.tags),
                 selectinload(Task.subtasks),
             )
@@ -91,6 +93,7 @@ class TaskRepository:
         status: Optional[TaskStatus] = None,
         priority: Optional[TaskPriority] = None,
         category_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None,
         tag_id: Optional[uuid.UUID] = None,
         due_date_from: Optional[datetime] = None,
         due_date_to: Optional[datetime] = None,
@@ -114,6 +117,10 @@ class TaskRepository:
         # Category filter
         if category_id:
             query = query.where(Task.category_id == category_id)
+
+        # Project filter
+        if project_id:
+            query = query.where(Task.project_id == project_id)
 
         # Tag filter (join task_tags association table with distinct to prevent duplicates)
         if tag_id:
@@ -168,6 +175,7 @@ class TaskRepository:
         query = (
             query.options(
                 selectinload(Task.category),
+                selectinload(Task.project),
                 selectinload(Task.tags),
                 selectinload(Task.subtasks),
             )
