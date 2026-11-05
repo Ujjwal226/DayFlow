@@ -152,6 +152,12 @@ export const RecurringTasksPage: React.FC = () => {
               >
                 <span>Activity</span>
               </Link>
+              <Link
+                to="/analytics"
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
+              >
+                <span>Analytics</span>
+              </Link>
             </nav>
           </div>
 

@@ -14,6 +14,7 @@ import { ProjectDetailsPage } from '../pages/ProjectDetailsPage';
 import { RecurringTasksPage } from '../pages/RecurringTasksPage';
 import { RecurringTaskDetailsPage } from '../pages/RecurringTaskDetailsPage';
 import { ActivityPage } from '../pages/ActivityPage';
+import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
 
 export const AppRoutes: React.FC = () => {
@@ -114,6 +115,14 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <ActivityPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <AnalyticsPage />
           </ProtectedRoute>
         }
       />
