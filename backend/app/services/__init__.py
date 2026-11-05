@@ -5,6 +5,7 @@ from app.services.rate_limit_service import RateLimitService
 from app.services.category_service import CategoryService
 from app.services.tag_service import TagService
 from app.services.project_service import ProjectService
+from app.services.recurring_task_service import RecurringTaskService
 from app.services.task_service import TaskService
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "CategoryService",
     "TagService",
     "ProjectService",
+    "RecurringTaskService",
     "TaskService",
 ]

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -188,6 +188,9 @@ class TaskResponse(BaseModel):
     category_id: Optional[uuid.UUID] = None
     category: Optional[CategoryResponse] = None
     project_id: Optional[uuid.UUID] = None
+    recurring_task_id: Optional[uuid.UUID] = None
+    occurrence_date: Optional[date] = None
+    occurrence_index: Optional[int] = None
     tags: List[TagResponse] = Field(default_factory=list)
     title: str
     description: Optional[str] = None

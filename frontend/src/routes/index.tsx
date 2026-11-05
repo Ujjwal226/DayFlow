@@ -11,6 +11,8 @@ import { TasksPage } from '../pages/TasksPage';
 import { TaskDetailsPage } from '../pages/TaskDetailsPage';
 import { ProjectsPage } from '../pages/ProjectsPage';
 import { ProjectDetailsPage } from '../pages/ProjectDetailsPage';
+import { RecurringTasksPage } from '../pages/RecurringTasksPage';
+import { RecurringTaskDetailsPage } from '../pages/RecurringTaskDetailsPage';
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
 
 export const AppRoutes: React.FC = () => {
@@ -87,6 +89,22 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <ProjectDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recurring-tasks"
+        element={
+          <ProtectedRoute>
+            <RecurringTasksPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recurring-tasks/:id"
+        element={
+          <ProtectedRoute>
+            <RecurringTaskDetailsPage />
           </ProtectedRoute>
         }
       />

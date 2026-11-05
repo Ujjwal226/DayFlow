@@ -13,6 +13,9 @@ export interface Task {
   category_id: string | null;
   category?: Category | null;
   project_id?: string | null;
+  recurring_task_id?: string | null;
+  occurrence_date?: string | null;
+  occurrence_index?: number | null;
   tags?: Tag[];
   title: string;
   description: string | null;

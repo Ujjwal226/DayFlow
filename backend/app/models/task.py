@@ -1,8 +1,8 @@
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List, Optional
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text, Uuid, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -53,6 +53,23 @@ class Task(Base):
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+
+    # Recurring Task series relationship (nullable: standalone tasks or deleted series)
+    recurring_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("recurring_tasks.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    occurrence_date: Mapped[Optional[date]] = mapped_column(
+        Date,
+        nullable=True,
+        index=True,
+    )
+    occurrence_index: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
     )
 
     # Subtask self-referencing relationship (nullable: deleting parent deletes subtasks)
@@ -124,6 +141,7 @@ class Task(Base):
     user = relationship("User", backref="tasks")
     category = relationship("Category", back_populates="tasks")
     project = relationship("Project", back_populates="tasks")
+    recurring_task = relationship("RecurringTask", back_populates="occurrences")
     tags = relationship("Tag", secondary="task_tags", back_populates="tasks", lazy="selectin")
 
     # Parent and Subtasks relationships
@@ -146,7 +164,9 @@ class Task(Base):
         Index("ix_tasks_user_id_due_date", "user_id", "due_date"),
         Index("ix_tasks_user_id_category_id", "user_id", "category_id"),
         Index("ix_tasks_user_id_project_id", "user_id", "project_id"),
+        Index("ix_tasks_user_id_recurring_task_id", "user_id", "recurring_task_id"),
         Index("ix_tasks_user_id_parent_task_id", "user_id", "parent_task_id"),
+        UniqueConstraint("recurring_task_id", "occurrence_date", name="uq_tasks_recurring_task_occurrence_date"),
     )
 
     def __repr__(self) -> str:
