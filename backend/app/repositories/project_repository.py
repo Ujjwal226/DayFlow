@@ -37,28 +37,37 @@ class ProjectRepository:
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
-    def create(self, project: Project) -> Project:
+    def create(self, project: Project, commit: bool = True) -> Project:
         """Persist a new project in database."""
         self.db.add(project)
-        self.db.commit()
-        self.db.refresh(project)
+        if commit:
+            self.db.commit()
+            self.db.refresh(project)
+        else:
+            self.db.flush()
         return project
 
-    def update(self, project: Project) -> Project:
+    def update(self, project: Project, commit: bool = True) -> Project:
         """Save updates to an existing project."""
         project.updated_at = datetime.now(timezone.utc)
         self.db.add(project)
-        self.db.commit()
-        self.db.refresh(project)
+        if commit:
+            self.db.commit()
+            self.db.refresh(project)
+        else:
+            self.db.flush()
         return project
 
-    def delete(self, project: Project) -> None:
+    def delete(self, project: Project, commit: bool = True) -> None:
         """
         Delete project record.
         Due to ON DELETE SET NULL on Task.project_id foreign key, tasks are preserved.
         """
         self.db.delete(project)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
 
     def list_projects(
         self,

@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from app.api.v1.endpoints.activity_logs import router as activity_logs_router
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.categories import router as categories_router
 from app.api.v1.endpoints.health import router as health_router
@@ -11,6 +12,7 @@ from app.api.v1.endpoints.tasks import router as tasks_router
 api_v1_router = APIRouter()
 api_v1_router.include_router(health_router)
 api_v1_router.include_router(auth_router)
+api_v1_router.include_router(activity_logs_router)
 api_v1_router.include_router(projects_router)
 api_v1_router.include_router(recurring_tasks_router)
 api_v1_router.include_router(categories_router)

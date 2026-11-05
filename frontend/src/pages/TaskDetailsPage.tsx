@@ -14,6 +14,7 @@ import { CategoryBadge } from '../components/categories/CategoryBadge';
 import { TagBadge } from '../components/tags/TagBadge';
 import { SubtaskProgress } from '../components/tasks/SubtaskProgress';
 import { SubtaskList } from '../components/tasks/SubtaskList';
+import { ActivityTimeline } from '../components/activity/ActivityTimeline';
 import { TaskFormModal } from '../components/tasks/TaskForm';
 import {
   ArrowLeft,
@@ -315,6 +316,14 @@ export const TaskDetailsPage: React.FC = () => {
             onUpdateSubtask={handleUpdateSubtask}
             onDeleteSubtask={handleDeleteSubtask}
           />
+        </div>
+
+        {/* Activity Timeline Section */}
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-white tracking-tight">Activity History</h2>
+          </div>
+          <ActivityTimeline taskId={task.id} />
         </div>
       </main>
 

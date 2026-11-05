@@ -9,6 +9,7 @@ from app.api.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.task import TaskPriority, TaskStatus
 from app.models.user import User
+from app.schemas.activity_log import ActivityLogListResponse
 from app.schemas.auth import MessageResponse
 from app.schemas.task import (
     SubtaskCreateRequest,
@@ -247,6 +248,27 @@ def assign_task_tags(
     """Replace all tags assigned to a task, strictly validating user ownership."""
     service = TaskService(db)
     return service.assign_tags(user_id=current_user.id, task_id=task_id, payload=payload)
+
+
+# ---------------- Task Activity Timeline Endpoint ----------------
+
+@router.get(
+    "/{task_id}/activity",
+    response_model=ActivityLogListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Retrieve task activity timeline",
+)
+def get_task_activity_timeline(
+    task_id: uuid.UUID,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ActivityLogListResponse:
+    """Retrieve chronological activity timeline for a task strictly owned by current user."""
+    from app.services.activity_log_service import ActivityLogService
+    service = ActivityLogService(db)
+    return service.list_task_timeline(task_id=task_id, user_id=current_user.id, page=page, page_size=page_size)
 
 
 # ---------------- Subtasks Endpoints on Parent Task ----------------

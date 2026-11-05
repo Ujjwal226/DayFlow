@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.models.category import Category
 from app.models.tag import Tag
 from app.models.task import Task, TaskPriority, TaskStatus
+from app.models.activity_log import ActivityAction, ActivityEntityType
+from app.repositories.activity_log_repository import ActivityLogRepository
 from app.repositories.category_repository import CategoryRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.tag_repository import TagRepository
@@ -41,6 +43,7 @@ class TaskService:
         self.cat_repo = CategoryRepository(db)
         self.tag_repo = TagRepository(db)
         self.proj_repo = ProjectRepository(db)
+        self.activity_repo = ActivityLogRepository(db)
 
     @staticmethod
     def _is_task_overdue(task: Task, now: Optional[datetime] = None) -> bool:
@@ -184,11 +187,39 @@ class TaskService:
             is_archived=False,
             tags=tags,
         )
-        created = self.repo.create(task)
-        logger.info("Created task id=%s for user_id=%s", created.id, user_id)
-        # Re-fetch with relations loaded
-        full_task = self.repo.get_by_id(created.id, user_id)
-        return self._to_response(full_task or created)
+        try:
+            created = self.repo.create(task, commit=False)
+            logger.info("Created task id=%s for user_id=%s", created.id, user_id)
+
+            # Log TASK_CREATED activity
+            from app.models.activity_log import ActivityLog
+            self.activity_repo.create(
+                ActivityLog(
+                    user_id=user_id,
+                    actor_id=user_id,
+                    task_id=created.id,
+                    recurring_task_id=created.recurring_task_id,
+                    entity_type=ActivityEntityType.TASK.value,
+                    entity_id=created.id,
+                    action=ActivityAction.TASK_CREATED.value,
+                    changes=None,
+                    extra_metadata={
+                        "title": created.title,
+                        "priority": created.priority.value if hasattr(created.priority, "value") else str(created.priority),
+                        "status": created.status.value if hasattr(created.status, "value") else str(created.status),
+                    },
+                ),
+                commit=False,
+            )
+
+            self.db.commit()
+
+            # Re-fetch with relations loaded
+            full_task = self.repo.get_by_id(created.id, user_id)
+            return self._to_response(full_task or created)
+        except Exception:
+            self.db.rollback()
+            raise
 
     def get_task(self, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskResponse:
         """Retrieve task by id strictly owned by user_id."""
@@ -227,6 +258,18 @@ class TaskService:
                     detail="Due date cannot be earlier than start date.",
                 )
 
+        # Capture original values for activity log diff
+        changes = {}
+        old_status = task.status
+        old_title = task.title
+        old_desc = task.description
+        old_priority = task.priority
+        old_start = task.start_date
+        old_due = task.due_date
+        old_cat_id = task.category_id
+        old_proj_id = task.project_id
+        old_tag_ids = sorted([str(t.id) for t in (task.tags or [])])
+
         # Validate category ownership if updating category
         if "category_id" in payload.model_fields_set:
             if payload.category_id is not None:
@@ -237,6 +280,8 @@ class TaskService:
                         detail="Category not found.",
                     )
             task.category_id = payload.category_id
+            if old_cat_id != payload.category_id:
+                changes["category_id"] = {"old": str(old_cat_id) if old_cat_id else None, "new": str(payload.category_id) if payload.category_id else None}
 
         # Validate project ownership if updating project
         if "project_id" in payload.model_fields_set:
@@ -248,6 +293,8 @@ class TaskService:
                         detail="Project not found.",
                     )
             task.project_id = payload.project_id
+            if old_proj_id != payload.project_id:
+                changes["project_id"] = {"old": str(old_proj_id) if old_proj_id else None, "new": str(payload.project_id) if payload.project_id else None}
 
         # Validate tag ownership if updating tags
         if "tag_ids" in payload.model_fields_set and payload.tag_ids is not None:
@@ -258,31 +305,82 @@ class TaskService:
                     detail="One or more tags not found.",
                 )
             task.tags = tags
+            new_tag_ids = sorted([str(t.id) for t in tags])
+            if old_tag_ids != new_tag_ids:
+                changes["tag_ids"] = {"old": old_tag_ids, "new": new_tag_ids}
 
         if "title" in payload.model_fields_set and payload.title is not None:
+            if old_title != payload.title:
+                changes["title"] = {"old": old_title, "new": payload.title}
             task.title = payload.title
         if "description" in payload.model_fields_set:
+            if old_desc != payload.description:
+                changes["description"] = {"old": old_desc, "new": payload.description}
             task.description = payload.description
         if "priority" in payload.model_fields_set and payload.priority is not None:
+            if old_priority != payload.priority:
+                changes["priority"] = {
+                    "old": old_priority.value if hasattr(old_priority, "value") else str(old_priority),
+                    "new": payload.priority.value if hasattr(payload.priority, "value") else str(payload.priority),
+                }
             task.priority = payload.priority
         if "start_date" in payload.model_fields_set:
+            if old_start != payload.start_date:
+                changes["start_date"] = {"old": old_start.isoformat() if old_start else None, "new": payload.start_date.isoformat() if payload.start_date else None}
             task.start_date = payload.start_date
         if "due_date" in payload.model_fields_set:
+            if old_due != payload.due_date:
+                changes["due_date"] = {"old": old_due.isoformat() if old_due else None, "new": payload.due_date.isoformat() if payload.due_date else None}
             task.due_date = payload.due_date
 
+        action_type = ActivityAction.TASK_UPDATED
         if "status" in payload.model_fields_set and payload.status is not None:
-            old_status = task.status
             new_status = payload.status
+            if old_status != new_status:
+                changes["status"] = {
+                    "old": old_status.value if hasattr(old_status, "value") else str(old_status),
+                    "new": new_status.value if hasattr(new_status, "value") else str(new_status),
+                }
+                if new_status == TaskStatus.COMPLETED:
+                    action_type = ActivityAction.TASK_COMPLETED
+                elif old_status == TaskStatus.COMPLETED and new_status != TaskStatus.COMPLETED:
+                    action_type = ActivityAction.TASK_REOPENED
+
             task.status = new_status
             if new_status == TaskStatus.COMPLETED and old_status != TaskStatus.COMPLETED:
                 task.completed_at = datetime.now(timezone.utc)
             elif new_status != TaskStatus.COMPLETED and old_status == TaskStatus.COMPLETED:
                 task.completed_at = None
 
-        updated = self.repo.update(task)
-        logger.info("Updated task id=%s for user_id=%s", updated.id, user_id)
-        full_task = self.repo.get_by_id(updated.id, user_id)
-        return self._to_response(full_task or updated)
+        try:
+            updated = self.repo.update(task, commit=False)
+            logger.info("Updated task id=%s for user_id=%s", updated.id, user_id)
+
+            # Log activity only if meaningful changes occurred
+            if changes:
+                from app.models.activity_log import ActivityLog
+                self.activity_repo.create(
+                    ActivityLog(
+                        user_id=user_id,
+                        actor_id=user_id,
+                        task_id=updated.id,
+                        recurring_task_id=updated.recurring_task_id,
+                        entity_type=ActivityEntityType.TASK.value,
+                        entity_id=updated.id,
+                        action=action_type.value,
+                        changes=changes,
+                        extra_metadata={"title": updated.title},
+                    ),
+                    commit=False,
+                )
+
+            self.db.commit()
+
+            full_task = self.repo.get_by_id(updated.id, user_id)
+            return self._to_response(full_task or updated)
+        except Exception:
+            self.db.rollback()
+            raise
 
     def assign_category(
         self,
@@ -309,7 +407,7 @@ class TaskService:
         else:
             task.category_id = None
 
-        updated = self.repo.update(task)
+        updated = self.repo.update(task, commit=True)
         full_task = self.repo.get_by_id(updated.id, user_id)
         return self._to_response(full_task or updated)
 
@@ -335,8 +433,51 @@ class TaskService:
                 detail="One or more tags not found.",
             )
 
+        old_tag_ids = set(t.id for t in (task.tags or []))
+        new_tag_ids = set(t.id for t in tags)
+
+        added_ids = new_tag_ids - old_tag_ids
+        removed_ids = old_tag_ids - new_tag_ids
+
         task.tags = tags
-        updated = self.repo.update(task)
+        updated = self.repo.update(task, commit=False)
+
+        # Log individual tag assignment and removal events if changed
+        from app.models.activity_log import ActivityLog
+        for tag in tags:
+            if tag.id in added_ids:
+                self.activity_repo.create(
+                    ActivityLog(
+                        user_id=user_id,
+                        actor_id=user_id,
+                        task_id=task.id,
+                        recurring_task_id=task.recurring_task_id,
+                        entity_type=ActivityEntityType.TAG.value,
+                        entity_id=tag.id,
+                        action=ActivityAction.TAG_ASSIGNED.value,
+                        extra_metadata={"tag_name": tag.name, "task_id": str(task.id), "task_title": task.title},
+                    ),
+                    commit=False,
+                )
+
+        old_tags_map = {t.id: t.name for t in (task.tags or [])}
+        for rem_id in removed_ids:
+            self.activity_repo.create(
+                ActivityLog(
+                    user_id=user_id,
+                    actor_id=user_id,
+                    task_id=task.id,
+                    recurring_task_id=task.recurring_task_id,
+                    entity_type=ActivityEntityType.TAG.value,
+                    entity_id=rem_id,
+                    action=ActivityAction.TAG_REMOVED.value,
+                    extra_metadata={"tag_id": str(rem_id), "task_id": str(task.id), "task_title": task.title},
+                ),
+                commit=False,
+            )
+
+        self.db.commit()
+
         full_task = self.repo.get_by_id(updated.id, user_id)
         return self._to_response(full_task or updated)
 
@@ -348,7 +489,31 @@ class TaskService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Task not found.",
             )
-        self.repo.delete(task)
+
+        # Snapshot task info before deletion to preserve audit history in activity log
+        from app.models.activity_log import ActivityLog
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                task_id=task.id,
+                recurring_task_id=task.recurring_task_id,
+                entity_type=ActivityEntityType.TASK.value,
+                entity_id=task.id,
+                action=ActivityAction.TASK_DELETED.value,
+                changes=None,
+                extra_metadata={
+                    "title": task.title,
+                    "description": task.description,
+                    "priority": task.priority.value if hasattr(task.priority, "value") else str(task.priority),
+                    "status": task.status.value if hasattr(task.status, "value") else str(task.status),
+                    "deleted_at": datetime.now(timezone.utc).isoformat(),
+                },
+            ),
+            commit=False,
+        )
+
+        self.repo.delete(task, commit=True)
         logger.info("Deleted task id=%s for user_id=%s", task_id, user_id)
 
     def duplicate_task(self, user_id: uuid.UUID, task_id: uuid.UUID) -> TaskResponse:
@@ -382,7 +547,31 @@ class TaskService:
             is_archived=False,
             tags=list(source.tags or []),
         )
-        created = self.repo.create(new_task)
+        created = self.repo.create(new_task, commit=False)
+
+        # Log TASK_DUPLICATED
+        from app.models.activity_log import ActivityLog
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                task_id=created.id,
+                recurring_task_id=created.recurring_task_id,
+                entity_type=ActivityEntityType.TASK.value,
+                entity_id=created.id,
+                action=ActivityAction.TASK_DUPLICATED.value,
+                changes=None,
+                extra_metadata={
+                    "source_task_id": str(source.id),
+                    "source_title": source.title,
+                    "title": created.title,
+                },
+            ),
+            commit=False,
+        )
+
+        self.db.commit()
+
         full_task = self.repo.get_by_id(created.id, user_id)
         logger.info("Duplicated task id=%s to new_id=%s for user_id=%s", task_id, created.id, user_id)
         return self._to_response(full_task or created)
@@ -395,7 +584,26 @@ class TaskService:
                 detail="Task not found.",
             )
         task.is_archived = True
-        updated = self.repo.update(task)
+        updated = self.repo.update(task, commit=False)
+
+        from app.models.activity_log import ActivityLog
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                task_id=updated.id,
+                recurring_task_id=updated.recurring_task_id,
+                entity_type=ActivityEntityType.TASK.value,
+                entity_id=updated.id,
+                action=ActivityAction.TASK_ARCHIVED.value,
+                changes={"is_archived": {"old": False, "new": True}},
+                extra_metadata={"title": updated.title},
+            ),
+            commit=False,
+        )
+
+        self.db.commit()
+
         full_task = self.repo.get_by_id(updated.id, user_id)
         return self._to_response(full_task or updated)
 
@@ -407,7 +615,26 @@ class TaskService:
                 detail="Task not found.",
             )
         task.is_archived = False
-        updated = self.repo.update(task)
+        updated = self.repo.update(task, commit=False)
+
+        from app.models.activity_log import ActivityLog
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                task_id=updated.id,
+                recurring_task_id=updated.recurring_task_id,
+                entity_type=ActivityEntityType.TASK.value,
+                entity_id=updated.id,
+                action=ActivityAction.TASK_RESTORED.value,
+                changes={"is_archived": {"old": True, "new": False}},
+                extra_metadata={"title": updated.title},
+            ),
+            commit=False,
+        )
+
+        self.db.commit()
+
         full_task = self.repo.get_by_id(updated.id, user_id)
         return self._to_response(full_task or updated)
 
@@ -514,8 +741,32 @@ class TaskService:
             completed_at=completed_at,
             is_archived=False,
         )
-        created = self.repo.create(subtask)
+        created = self.repo.create(subtask, commit=False)
         logger.info("Created subtask id=%s under parent_id=%s for user_id=%s", created.id, parent_task_id, user_id)
+
+        # Log SUBTASK_CREATED
+        from app.models.activity_log import ActivityLog
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                task_id=parent_task_id,
+                recurring_task_id=parent.recurring_task_id,
+                entity_type=ActivityEntityType.SUBTASK.value,
+                entity_id=created.id,
+                action=ActivityAction.SUBTASK_CREATED.value,
+                changes=None,
+                extra_metadata={
+                    "parent_task_id": str(parent_task_id),
+                    "parent_title": parent.title,
+                    "title": created.title,
+                },
+            ),
+            commit=False,
+        )
+
+        self.db.commit()
+
         return self._to_subtask_response(created)
 
     def list_subtasks(self, parent_task_id: uuid.UUID, user_id: uuid.UUID) -> List[SubtaskResponse]:
@@ -553,26 +804,72 @@ class TaskService:
                 detail="Subtask not found.",
             )
 
+        # Capture diff for subtask
+        changes = {}
+        old_title = subtask.title
+        old_desc = subtask.description
+        old_priority = subtask.priority
+        old_due = subtask.due_date
+        old_status = subtask.status
+
         if "title" in payload.model_fields_set and payload.title is not None:
+            if old_title != payload.title:
+                changes["title"] = {"old": old_title, "new": payload.title}
             subtask.title = payload.title
         if "description" in payload.model_fields_set:
+            if old_desc != payload.description:
+                changes["description"] = {"old": old_desc, "new": payload.description}
             subtask.description = payload.description
         if "priority" in payload.model_fields_set and payload.priority is not None:
+            if old_priority != payload.priority:
+                changes["priority"] = {
+                    "old": old_priority.value if hasattr(old_priority, "value") else str(old_priority),
+                    "new": payload.priority.value if hasattr(payload.priority, "value") else str(payload.priority),
+                }
             subtask.priority = payload.priority
         if "due_date" in payload.model_fields_set:
+            if old_due != payload.due_date:
+                changes["due_date"] = {"old": old_due.isoformat() if old_due else None, "new": payload.due_date.isoformat() if payload.due_date else None}
             subtask.due_date = payload.due_date
 
+        action_type = ActivityAction.SUBTASK_UPDATED
         if "status" in payload.model_fields_set and payload.status is not None:
-            old_status = subtask.status
             new_status = payload.status
+            if old_status != new_status:
+                changes["status"] = {
+                    "old": old_status.value if hasattr(old_status, "value") else str(old_status),
+                    "new": new_status.value if hasattr(new_status, "value") else str(new_status),
+                }
+                if new_status == TaskStatus.COMPLETED:
+                    action_type = ActivityAction.SUBTASK_COMPLETED
+
             subtask.status = new_status
             if new_status == TaskStatus.COMPLETED and old_status != TaskStatus.COMPLETED:
                 subtask.completed_at = datetime.now(timezone.utc)
             elif new_status != TaskStatus.COMPLETED and old_status == TaskStatus.COMPLETED:
                 subtask.completed_at = None
 
-        updated = self.repo.update(subtask)
+        updated = self.repo.update(subtask, commit=False)
         logger.info("Updated subtask id=%s for user_id=%s", updated.id, user_id)
+
+        if changes:
+            from app.models.activity_log import ActivityLog
+            self.activity_repo.create(
+                ActivityLog(
+                    user_id=user_id,
+                    actor_id=user_id,
+                    task_id=subtask.parent_task_id,
+                    entity_type=ActivityEntityType.SUBTASK.value,
+                    entity_id=updated.id,
+                    action=action_type.value,
+                    changes=changes,
+                    extra_metadata={"title": updated.title, "parent_task_id": str(subtask.parent_task_id)},
+                ),
+                commit=False,
+            )
+
+        self.db.commit()
+
         return self._to_subtask_response(updated)
 
     def delete_subtask(self, subtask_id: uuid.UUID, user_id: uuid.UUID) -> None:
@@ -583,5 +880,25 @@ class TaskService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Subtask not found.",
             )
-        self.repo.delete(subtask)
+
+        # Log SUBTASK_DELETED
+        from app.models.activity_log import ActivityLog
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                task_id=subtask.parent_task_id,
+                entity_type=ActivityEntityType.SUBTASK.value,
+                entity_id=subtask.id,
+                action=ActivityAction.SUBTASK_DELETED.value,
+                changes=None,
+                extra_metadata={
+                    "title": subtask.title,
+                    "parent_task_id": str(subtask.parent_task_id),
+                },
+            ),
+            commit=False,
+        )
+
+        self.repo.delete(subtask, commit=True)
         logger.info("Deleted subtask id=%s for user_id=%s", subtask_id, user_id)

@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.models.recurring_task import RecurrenceFrequency, RecurringTask, RecurringTaskSkip
 from app.models.task import Task, TaskPriority, TaskStatus
+from app.models.activity_log import ActivityAction, ActivityEntityType, ActivityLog
+from app.repositories.activity_log_repository import ActivityLogRepository
 from app.repositories.category_repository import CategoryRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.recurring_task_repository import RecurringTaskRepository
@@ -34,6 +36,7 @@ class RecurringTaskService:
         self.task_repo = TaskRepository(db)
         self.cat_repo = CategoryRepository(db)
         self.proj_repo = ProjectRepository(db)
+        self.activity_repo = ActivityLogRepository(db)
 
     def _parse_weekdays_from_str(self, weekdays_str: Optional[str]) -> Optional[List[int]]:
         if not weekdays_str:
@@ -119,7 +122,26 @@ class RecurringTaskService:
             # Generate initial occurrence within the same atomic transaction (flush without committing yet)
             self._generate_occurrences_for_series(created, cutoff=payload.start_date)
 
-            # Commit the unified transaction (series + initial occurrence) atomically
+            # Log RECURRING_SERIES_CREATED within the same atomic transaction
+            self.activity_repo.create(
+                ActivityLog(
+                    user_id=user_id,
+                    actor_id=user_id,
+                    recurring_task_id=created.id,
+                    entity_type=ActivityEntityType.RECURRING_TASK.value,
+                    entity_id=created.id,
+                    action=ActivityAction.RECURRING_SERIES_CREATED.value,
+                    changes=None,
+                    extra_metadata={
+                        "title": created.title,
+                        "frequency": created.frequency.value if hasattr(created.frequency, "value") else str(created.frequency),
+                        "interval": created.interval,
+                    },
+                ),
+                commit=False,
+            )
+
+            # Commit the unified transaction (series + initial occurrence + activity log) atomically
             self.db.commit()
 
             fresh = self.repo.get_by_id(created.id, user_id)
@@ -144,6 +166,16 @@ class RecurringTaskService:
         if not series:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recurring task series not found.")
 
+        # Track changes for activity log
+        changes = {}
+        old_title = series.title
+        old_desc = series.description
+        old_pri = series.priority
+        old_freq = series.frequency
+        old_interval = series.interval
+        old_end = series.end_date
+        old_max = series.max_occurrences
+
         if payload.category_id is not None:
             cat = self.cat_repo.get_by_id(payload.category_id, user_id)
             if not cat:
@@ -156,17 +188,28 @@ class RecurringTaskService:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
             series.project_id = payload.project_id
 
-        if payload.title is not None:
+        if payload.title is not None and payload.title != old_title:
+            changes["title"] = {"old": old_title, "new": payload.title}
             series.title = payload.title
-        if payload.description is not None:
+        if payload.description is not None and payload.description != old_desc:
+            changes["description"] = {"old": old_desc, "new": payload.description}
             series.description = payload.description
-        if payload.priority is not None:
+        if payload.priority is not None and payload.priority != old_pri:
+            changes["priority"] = {
+                "old": old_pri.value if hasattr(old_pri, "value") else str(old_pri),
+                "new": payload.priority.value if hasattr(payload.priority, "value") else str(payload.priority),
+            }
             series.priority = payload.priority
         schedule_changed = False
         if payload.frequency is not None and payload.frequency != series.frequency:
+            changes["frequency"] = {
+                "old": old_freq.value if hasattr(old_freq, "value") else str(old_freq),
+                "new": payload.frequency.value if hasattr(payload.frequency, "value") else str(payload.frequency),
+            }
             series.frequency = payload.frequency
             schedule_changed = True
         if payload.interval is not None and payload.interval != series.interval:
+            changes["interval"] = {"old": old_interval, "new": payload.interval}
             series.interval = payload.interval
             schedule_changed = True
         if payload.end_date is not None:
@@ -176,10 +219,12 @@ class RecurringTaskService:
                     detail="End date cannot be earlier than start date.",
                 )
             if payload.end_date != series.end_date:
+                changes["end_date"] = {"old": old_end.isoformat() if old_end else None, "new": payload.end_date.isoformat()}
                 series.end_date = payload.end_date
                 schedule_changed = True
         if payload.max_occurrences is not None:
             if payload.max_occurrences != series.max_occurrences:
+                changes["max_occurrences"] = {"old": old_max, "new": payload.max_occurrences}
                 series.max_occurrences = payload.max_occurrences
                 schedule_changed = True
 
@@ -314,7 +359,24 @@ class RecurringTaskService:
                         month_of_year=series.month_of_year,
                     )
 
-        updated = self.repo.update(series, commit=True)
+        updated = self.repo.update(series, commit=False)
+
+        if changes:
+            self.activity_repo.create(
+                ActivityLog(
+                    user_id=user_id,
+                    actor_id=user_id,
+                    recurring_task_id=updated.id,
+                    entity_type=ActivityEntityType.RECURRING_TASK.value,
+                    entity_id=updated.id,
+                    action=ActivityAction.RECURRING_SERIES_UPDATED.value,
+                    changes=changes,
+                    extra_metadata={"title": updated.title},
+                ),
+                commit=False,
+            )
+
+        self.db.commit()
         return self._to_response(updated)
 
     def pause_series(self, series_id: uuid.UUID, user_id: uuid.UUID) -> RecurringTaskResponse:
@@ -322,7 +384,23 @@ class RecurringTaskService:
         if not series:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recurring task series not found.")
         series.is_active = False
-        updated = self.repo.update(series, commit=True)
+        updated = self.repo.update(series, commit=False)
+
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                recurring_task_id=updated.id,
+                entity_type=ActivityEntityType.RECURRING_TASK.value,
+                entity_id=updated.id,
+                action=ActivityAction.RECURRING_SERIES_PAUSED.value,
+                changes={"is_active": {"old": True, "new": False}},
+                extra_metadata={"title": updated.title},
+            ),
+            commit=False,
+        )
+
+        self.db.commit()
         return self._to_response(updated)
 
     def resume_series(self, series_id: uuid.UUID, user_id: uuid.UUID) -> RecurringTaskResponse:
@@ -332,7 +410,23 @@ class RecurringTaskService:
         if series.is_stopped:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot resume a stopped series.")
         series.is_active = True
-        updated = self.repo.update(series, commit=True)
+        updated = self.repo.update(series, commit=False)
+
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                recurring_task_id=updated.id,
+                entity_type=ActivityEntityType.RECURRING_TASK.value,
+                entity_id=updated.id,
+                action=ActivityAction.RECURRING_SERIES_RESUMED.value,
+                changes={"is_active": {"old": False, "new": True}},
+                extra_metadata={"title": updated.title},
+            ),
+            commit=False,
+        )
+
+        self.db.commit()
         return self._to_response(updated)
 
     def stop_series(self, series_id: uuid.UUID, user_id: uuid.UUID) -> RecurringTaskResponse:
@@ -342,13 +436,48 @@ class RecurringTaskService:
         series.is_stopped = True
         series.is_active = False
         series.next_occurrence_date = None
-        updated = self.repo.update(series, commit=True)
+        updated = self.repo.update(series, commit=False)
+
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                recurring_task_id=updated.id,
+                entity_type=ActivityEntityType.RECURRING_TASK.value,
+                entity_id=updated.id,
+                action=ActivityAction.RECURRING_SERIES_STOPPED.value,
+                changes={"is_stopped": {"old": False, "new": True}, "is_active": {"old": True, "new": False}},
+                extra_metadata={"title": updated.title},
+            ),
+            commit=False,
+        )
+
+        self.db.commit()
         return self._to_response(updated)
 
     def delete_series(self, series_id: uuid.UUID, user_id: uuid.UUID) -> None:
         series = self.repo.get_by_id_for_update(series_id, user_id)
         if not series:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recurring task series not found.")
+
+        # Log deletion snapshot before removing
+        self.activity_repo.create(
+            ActivityLog(
+                user_id=user_id,
+                actor_id=user_id,
+                recurring_task_id=series.id,
+                entity_type=ActivityEntityType.RECURRING_TASK.value,
+                entity_id=series.id,
+                action=ActivityAction.RECURRING_SERIES_DELETED.value,
+                changes=None,
+                extra_metadata={
+                    "title": series.title,
+                    "frequency": series.frequency.value if hasattr(series.frequency, "value") else str(series.frequency),
+                },
+            ),
+            commit=False,
+        )
+
         self.repo.delete(series, commit=True)
 
     def list_series(
@@ -426,6 +555,25 @@ class RecurringTaskService:
                 reason=payload.reason,
             )
             self.repo.add_skip(skip, commit=False)
+
+            # Log RECURRING_OCCURRENCE_SKIPPED
+            self.activity_repo.create(
+                ActivityLog(
+                    user_id=user_id,
+                    actor_id=user_id,
+                    recurring_task_id=series.id,
+                    entity_type=ActivityEntityType.RECURRING_TASK.value,
+                    entity_id=series.id,
+                    action=ActivityAction.RECURRING_OCCURRENCE_SKIPPED.value,
+                    changes=None,
+                    extra_metadata={
+                        "title": series.title,
+                        "skip_date": payload.skip_date.isoformat(),
+                        "reason": payload.reason,
+                    },
+                ),
+                commit=False,
+            )
 
         # Advance next_occurrence_date if the skipped date matches current next
         if series.next_occurrence_date == payload.skip_date:
@@ -567,8 +715,29 @@ class RecurringTaskService:
                         is_archived=False,
                     )
                     self.db.add(occurrence_task)
+                    self.db.flush()  # assign occurrence_task.id
                     locked_series.occurrences_generated += 1
                     created_count += 1
+
+                    # Log RECURRING_OCCURRENCE_GENERATED
+                    self.activity_repo.create(
+                        ActivityLog(
+                            user_id=locked_series.user_id,
+                            actor_id=locked_series.user_id,
+                            task_id=occurrence_task.id,
+                            recurring_task_id=locked_series.id,
+                            entity_type=ActivityEntityType.TASK.value,
+                            entity_id=occurrence_task.id,
+                            action=ActivityAction.RECURRING_OCCURRENCE_GENERATED.value,
+                            changes=None,
+                            extra_metadata={
+                                "title": occurrence_task.title,
+                                "occurrence_date": curr_date.isoformat(),
+                                "series_title": locked_series.title,
+                            },
+                        ),
+                        commit=False,
+                    )
 
             # Calculate next date
             next_date = calculate_next_occurrence(

@@ -50,25 +50,34 @@ class TaskRepository:
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
-    def create(self, task: Task) -> Task:
+    def create(self, task: Task, commit: bool = True) -> Task:
         """Persist a new task in database."""
         self.db.add(task)
-        self.db.commit()
-        self.db.refresh(task)
+        if commit:
+            self.db.commit()
+            self.db.refresh(task)
+        else:
+            self.db.flush()
         return task
 
-    def update(self, task: Task) -> Task:
+    def update(self, task: Task, commit: bool = True) -> Task:
         """Save updates to an existing task."""
         task.updated_at = datetime.now(timezone.utc)
         self.db.add(task)
-        self.db.commit()
-        self.db.refresh(task)
+        if commit:
+            self.db.commit()
+            self.db.refresh(task)
+        else:
+            self.db.flush()
         return task
 
-    def delete(self, task: Task) -> None:
+    def delete(self, task: Task, commit: bool = True) -> None:
         """Delete task record."""
         self.db.delete(task)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
 
     def list_subtasks(self, parent_task_id: uuid.UUID, user_id: uuid.UUID) -> List[Task]:
         """List subtasks belonging to a parent task strictly scoped by user_id."""

@@ -1,5 +1,6 @@
 # Database models imported here for Alembic detection and application use
 from app.db.session import Base
+from app.models.activity_log import ActivityAction, ActivityEntityType, ActivityLog
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
 from app.models.security_token import SecurityToken, TokenType
@@ -11,6 +12,9 @@ from app.models.recurring_task import RecurrenceFrequency, RecurringTask, Recurr
 from app.models.task import Task, TaskPriority, TaskStatus
 
 __all__ = [
+    "ActivityAction",
+    "ActivityEntityType",
+    "ActivityLog",
     "Base",
     "User",
     "RefreshToken",
