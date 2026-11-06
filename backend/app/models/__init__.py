@@ -1,6 +1,7 @@
 # Database models imported here for Alembic detection and application use
 from app.db.session import Base
 from app.models.activity_log import ActivityAction, ActivityEntityType, ActivityLog
+from app.models.calendar_event import CalendarEvent
 from app.models.dashboard_layout import DashboardLayout
 from app.models.user import User
 from app.models.refresh_token import RefreshToken
@@ -17,6 +18,7 @@ __all__ = [
     "ActivityEntityType",
     "ActivityLog",
     "Base",
+    "CalendarEvent",
     "DashboardLayout",
     "User",
     "RefreshToken",

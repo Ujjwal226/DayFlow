@@ -28,18 +28,19 @@ class DashboardLayoutService:
             return DashboardLayoutResponse(
                 id=None,
                 user_id=user_id,
-                widgets=[DashboardWidgetItemSchema(**w) for w in default_widgets],
+                widgets=[DashboardWidgetItemSchema.model_validate(w) for w in default_widgets],
                 is_customized=False,
                 created_at=None,
                 updated_at=None,
             )
 
         # Sort widgets by order before returning
-        sorted_widgets = sorted(layout.widgets, key=lambda w: w.get("order", 0))
+        raw_widgets: List[dict] = layout.widgets if isinstance(layout.widgets, list) else []
+        sorted_widgets = sorted(raw_widgets, key=lambda w: w.get("order", 0))
         return DashboardLayoutResponse(
             id=layout.id,
             user_id=layout.user_id,
-            widgets=[DashboardWidgetItemSchema(**w) for w in sorted_widgets],
+            widgets=[DashboardWidgetItemSchema.model_validate(w) for w in sorted_widgets],
             is_customized=True,
             created_at=layout.created_at,
             updated_at=layout.updated_at,
@@ -67,10 +68,11 @@ class DashboardLayoutService:
         self.db.commit()
         self.db.refresh(layout)
 
+        saved_widgets: List[dict] = layout.widgets if isinstance(layout.widgets, list) else []
         return DashboardLayoutResponse(
             id=layout.id,
             user_id=layout.user_id,
-            widgets=[DashboardWidgetItemSchema(**w) for w in layout.widgets],
+            widgets=[DashboardWidgetItemSchema.model_validate(w) for w in saved_widgets],
             is_customized=True,
             created_at=layout.created_at,
             updated_at=layout.updated_at,
@@ -87,7 +89,7 @@ class DashboardLayoutService:
         return DashboardLayoutResponse(
             id=None,
             user_id=user_id,
-            widgets=[DashboardWidgetItemSchema(**w) for w in default_widgets],
+            widgets=[DashboardWidgetItemSchema.model_validate(w) for w in default_widgets],
             is_customized=False,
             created_at=None,
             updated_at=None,

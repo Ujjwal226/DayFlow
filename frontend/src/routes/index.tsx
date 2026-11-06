@@ -7,6 +7,7 @@ import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { DashboardPage } from '../pages/DashboardPage';
+import { CalendarPage } from '../pages/CalendarPage';
 import { TasksPage } from '../pages/TasksPage';
 import { TaskDetailsPage } from '../pages/TaskDetailsPage';
 import { ProjectsPage } from '../pages/ProjectsPage';
@@ -59,6 +60,14 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/calendar"
+        element={
+          <ProtectedRoute>
+            <CalendarPage />
           </ProtectedRoute>
         }
       />

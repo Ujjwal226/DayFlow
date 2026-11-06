@@ -278,3 +278,49 @@ class TaskRepository:
             "overdue": overdue_count,
             "upcoming": upcoming_count,
         }
+
+    def get_tasks_for_calendar_range(
+        self,
+        user_id: uuid.UUID,
+        range_start: datetime,
+        range_end: datetime,
+        project_id: Optional[uuid.UUID] = None,
+        category_id: Optional[uuid.UUID] = None,
+        status: Optional[TaskStatus] = None,
+        priority: Optional[TaskPriority] = None,
+        recurring_only: Optional[bool] = None,
+    ) -> List[Task]:
+        """
+        Fetch user tasks with due_date in [range_start, range_end) for calendar feed.
+        Eager loads category and project relationships.
+        Excludes subtasks (parent_task_id is not null) and archived tasks.
+        """
+        stmt = (
+            select(Task)
+            .options(
+                selectinload(Task.category),
+                selectinload(Task.project),
+            )
+            .where(
+                Task.user_id == user_id,
+                Task.is_archived == False,  # noqa: E712
+                Task.parent_task_id.is_(None),
+                Task.due_date >= range_start,
+                Task.due_date < range_end,
+            )
+        )
+
+        if project_id:
+            stmt = stmt.where(Task.project_id == project_id)
+        if category_id:
+            stmt = stmt.where(Task.category_id == category_id)
+        if status:
+            stmt = stmt.where(Task.status == status)
+        if priority:
+            stmt = stmt.where(Task.priority == priority)
+        if recurring_only is True:
+            stmt = stmt.where(Task.recurring_task_id.isnot(None))
+
+        stmt = stmt.order_by(Task.due_date.asc(), Task.id.asc())
+        return list(self.db.execute(stmt).scalars().all())
+

@@ -8,6 +8,7 @@ import { DashboardCustomizerModal } from '../components/dashboard/DashboardCusto
 import {
   Layers,
   CheckSquare,
+  Calendar,
   LogOut,
   ShieldAlert,
   Sliders,
@@ -108,6 +109,13 @@ export const DashboardPage: React.FC = () => {
               >
                 <Layers className="w-3.5 h-3.5" />
                 <span>Dashboard</span>
+              </Link>
+              <Link
+                to="/calendar"
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Calendar</span>
               </Link>
               <Link
                 to="/tasks"
