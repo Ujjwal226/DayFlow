@@ -5,6 +5,7 @@ from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.calendar import router as calendar_router
 from app.api.v1.endpoints.categories import router as categories_router
 from app.api.v1.endpoints.dashboard import router as dashboard_router
+from app.api.v1.endpoints.focus import router as focus_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.notes import router as notes_router
 from app.api.v1.endpoints.notification_preferences import router as notification_preferences_router
@@ -33,3 +34,4 @@ api_v1_router.include_router(subtasks_router)
 api_v1_router.include_router(reminders_router)
 api_v1_router.include_router(notifications_router)
 api_v1_router.include_router(notification_preferences_router)
+api_v1_router.include_router(focus_router)

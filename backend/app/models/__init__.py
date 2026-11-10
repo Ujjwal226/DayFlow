@@ -14,6 +14,7 @@ from app.models.recurring_task import RecurrenceFrequency, RecurringTask, Recurr
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.note import Note, NoteTag
 from app.models.reminder import Reminder, Notification, EmailDelivery, NotificationPreference
+from app.models.focus import FocusSession, FocusPreference
 
 __all__ = [
     "ActivityAction",
@@ -46,4 +47,6 @@ __all__ = [
     "Notification",
     "EmailDelivery",
     "NotificationPreference",
+    "FocusSession",
+    "FocusPreference",
 ]

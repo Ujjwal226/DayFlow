@@ -21,6 +21,7 @@ import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { RemindersPage } from '../pages/RemindersPage';
 import { NotificationsPage } from '../pages/NotificationsPage';
 import { NotificationPreferencesPage } from '../pages/NotificationPreferencesPage';
+import { FocusPage } from '../pages/FocusPage';
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
 
 export const AppRoutes: React.FC = () => {
@@ -177,6 +178,14 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <NotificationPreferencesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/focus"
+        element={
+          <ProtectedRoute>
+            <FocusPage />
           </ProtectedRoute>
         }
       />
