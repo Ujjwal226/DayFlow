@@ -7,8 +7,11 @@ from app.api.v1.endpoints.categories import router as categories_router
 from app.api.v1.endpoints.dashboard import router as dashboard_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.notes import router as notes_router
+from app.api.v1.endpoints.notification_preferences import router as notification_preferences_router
+from app.api.v1.endpoints.notifications import router as notifications_router
 from app.api.v1.endpoints.projects import router as projects_router
 from app.api.v1.endpoints.recurring_tasks import router as recurring_tasks_router
+from app.api.v1.endpoints.reminders import router as reminders_router
 from app.api.v1.endpoints.subtasks import router as subtasks_router
 from app.api.v1.endpoints.tags import router as tags_router
 from app.api.v1.endpoints.tasks import router as tasks_router
@@ -27,3 +30,6 @@ api_v1_router.include_router(categories_router)
 api_v1_router.include_router(tags_router)
 api_v1_router.include_router(tasks_router)
 api_v1_router.include_router(subtasks_router)
+api_v1_router.include_router(reminders_router)
+api_v1_router.include_router(notifications_router)
+api_v1_router.include_router(notification_preferences_router)

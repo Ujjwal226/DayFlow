@@ -5,6 +5,7 @@ import { dashboardApi } from '../api/dashboard';
 import { DashboardWidgetConfig } from '../types/dashboard';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { DashboardCustomizerModal } from '../components/dashboard/DashboardCustomizerModal';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 import {
   Layers,
   CheckSquare,
@@ -130,6 +131,12 @@ export const DashboardPage: React.FC = () => {
                 <span>Notes</span>
               </Link>
               <Link
+                to="/reminders"
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
+              >
+                <span>Reminders</span>
+              </Link>
+              <Link
                 to="/tasks"
                 className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
               >
@@ -164,6 +171,7 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-3">
+            <NotificationBell />
             <button
               onClick={() => logout()}
               disabled={authLoading}

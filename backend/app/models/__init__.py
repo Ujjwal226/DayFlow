@@ -13,6 +13,7 @@ from app.models.project import Project, ProjectPriority, ProjectStatus
 from app.models.recurring_task import RecurrenceFrequency, RecurringTask, RecurringTaskSkip
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.note import Note, NoteTag
+from app.models.reminder import Reminder, Notification, EmailDelivery, NotificationPreference
 
 __all__ = [
     "ActivityAction",
@@ -41,4 +42,8 @@ __all__ = [
     "TaskStatus",
     "Note",
     "NoteTag",
+    "Reminder",
+    "Notification",
+    "EmailDelivery",
+    "NotificationPreference",
 ]

@@ -18,6 +18,9 @@ import { RecurringTasksPage } from '../pages/RecurringTasksPage';
 import { RecurringTaskDetailsPage } from '../pages/RecurringTaskDetailsPage';
 import { ActivityPage } from '../pages/ActivityPage';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
+import { RemindersPage } from '../pages/RemindersPage';
+import { NotificationsPage } from '../pages/NotificationsPage';
+import { NotificationPreferencesPage } from '../pages/NotificationPreferencesPage';
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
 
 export const AppRoutes: React.FC = () => {
@@ -150,6 +153,30 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <AnalyticsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reminders"
+        element={
+          <ProtectedRoute>
+            <RemindersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationPreferencesPage />
           </ProtectedRoute>
         }
       />

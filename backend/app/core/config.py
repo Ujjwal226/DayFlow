@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     # Email & Verification Settings
     EMAIL_PROVIDER: str = "development"  # "development" or "smtp"
     EMAIL_FROM: str = "noreply@dayflow.app"
+    EMAIL_FROM_NAME: str = "DayFlow"
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
     VERIFICATION_TOKEN_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60
 
