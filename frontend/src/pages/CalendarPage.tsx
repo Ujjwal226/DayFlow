@@ -249,6 +249,12 @@ export const CalendarPage: React.FC = () => {
                 <span>Calendar</span>
               </Link>
               <Link
+                to="/kanban"
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
+              >
+                <span>Kanban</span>
+              </Link>
+              <Link
                 to="/tasks"
                 className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
               >
