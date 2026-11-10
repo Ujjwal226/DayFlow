@@ -251,6 +251,12 @@ export const KanbanPage: React.FC = () => {
                 <span>Kanban</span>
               </Link>
               <Link
+                to="/notes"
+                className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
+              >
+                <span>Notes</span>
+              </Link>
+              <Link
                 to="/tasks"
                 className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 text-xs font-medium transition flex items-center gap-1.5"
               >

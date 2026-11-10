@@ -6,6 +6,7 @@ from app.api.v1.endpoints.calendar import router as calendar_router
 from app.api.v1.endpoints.categories import router as categories_router
 from app.api.v1.endpoints.dashboard import router as dashboard_router
 from app.api.v1.endpoints.health import router as health_router
+from app.api.v1.endpoints.notes import router as notes_router
 from app.api.v1.endpoints.projects import router as projects_router
 from app.api.v1.endpoints.recurring_tasks import router as recurring_tasks_router
 from app.api.v1.endpoints.subtasks import router as subtasks_router
@@ -19,6 +20,7 @@ api_v1_router.include_router(calendar_router)
 api_v1_router.include_router(dashboard_router)
 api_v1_router.include_router(analytics_router)
 api_v1_router.include_router(activity_logs_router)
+api_v1_router.include_router(notes_router)
 api_v1_router.include_router(projects_router)
 api_v1_router.include_router(recurring_tasks_router)
 api_v1_router.include_router(categories_router)

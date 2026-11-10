@@ -9,6 +9,7 @@ import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { CalendarPage } from '../pages/CalendarPage';
 import { KanbanPage } from '../pages/KanbanPage';
+import { NotesPage } from '../pages/NotesPage';
 import { TasksPage } from '../pages/TasksPage';
 import { TaskDetailsPage } from '../pages/TaskDetailsPage';
 import { ProjectsPage } from '../pages/ProjectsPage';
@@ -77,6 +78,14 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <KanbanPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notes"
+        element={
+          <ProtectedRoute>
+            <NotesPage />
           </ProtectedRoute>
         }
       />

@@ -12,6 +12,7 @@ from app.models.tag import Tag, TaskTag
 from app.models.project import Project, ProjectPriority, ProjectStatus
 from app.models.recurring_task import RecurrenceFrequency, RecurringTask, RecurringTaskSkip
 from app.models.task import Task, TaskPriority, TaskStatus
+from app.models.note import Note, NoteTag
 
 __all__ = [
     "ActivityAction",
@@ -38,4 +39,6 @@ __all__ = [
     "Task",
     "TaskPriority",
     "TaskStatus",
+    "Note",
+    "NoteTag",
 ]
