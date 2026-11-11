@@ -12,7 +12,12 @@ export type DashboardWidgetId =
   | 'projects_overview'
   | 'productivity_trends'
   | 'recurring_insights'
-  | 'quick_actions';
+  | 'quick_actions'
+  | 'active_goals'
+  | 'upcoming_goal_deadlines'
+  | 'goal_progress_overview'
+  | 'recently_completed_goals'
+  | 'at_risk_goals';
 
 export interface DashboardWidgetConfig {
   widget_id: DashboardWidgetId | string;

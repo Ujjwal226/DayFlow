@@ -14,11 +14,16 @@ describe('Widget Registry', () => {
     'productivity_trends',
     'recurring_insights',
     'quick_actions',
+    'active_goals',
+    'upcoming_goal_deadlines',
+    'goal_progress_overview',
+    'recently_completed_goals',
+    'at_risk_goals',
   ];
 
-  it('registers all ten expected widgets', () => {
+  it('registers all fifteen expected widgets', () => {
     const registeredIds = Object.keys(WIDGET_REGISTRY);
-    expect(registeredIds).toHaveLength(10);
+    expect(registeredIds).toHaveLength(15);
     for (const expectedId of expectedWidgetIds) {
       expect(registeredIds).toContain(expectedId);
     }

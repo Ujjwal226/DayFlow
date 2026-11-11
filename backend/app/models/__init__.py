@@ -15,6 +15,19 @@ from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.note import Note, NoteTag
 from app.models.reminder import Reminder, Notification, EmailDelivery, NotificationPreference
 from app.models.focus import FocusSession, FocusPreference
+from app.models.goal import (
+    Goal,
+    GoalCategory,
+    GoalType,
+    GoalStatus,
+    GoalPriority,
+    ProgressCalculationMethod,
+    PlanningPeriodType,
+    GoalTaskLink,
+    GoalMilestone,
+    PlanningObjective,
+    GoalActivity,
+)
 
 __all__ = [
     "ActivityAction",
@@ -49,4 +62,15 @@ __all__ = [
     "NotificationPreference",
     "FocusSession",
     "FocusPreference",
+    "Goal",
+    "GoalCategory",
+    "GoalType",
+    "GoalStatus",
+    "GoalPriority",
+    "ProgressCalculationMethod",
+    "PlanningPeriodType",
+    "GoalTaskLink",
+    "GoalMilestone",
+    "PlanningObjective",
+    "GoalActivity",
 ]

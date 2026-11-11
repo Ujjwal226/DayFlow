@@ -13,6 +13,11 @@ import { ProjectsOverviewWidget } from './widgets/ProjectsOverviewWidget';
 import { ProductivityTrendsWidget } from './widgets/ProductivityTrendsWidget';
 import { RecurringInsightsWidget } from './widgets/RecurringInsightsWidget';
 import { QuickActionsWidget } from './widgets/QuickActionsWidget';
+import { ActiveGoalsWidget } from './widgets/ActiveGoalsWidget';
+import { UpcomingGoalDeadlinesWidget } from './widgets/UpcomingGoalDeadlinesWidget';
+import { GoalProgressOverviewWidget } from './widgets/GoalProgressOverviewWidget';
+import { RecentlyCompletedGoalsWidget } from './widgets/RecentlyCompletedGoalsWidget';
+import { AtRiskGoalsWidget } from './widgets/AtRiskGoalsWidget';
 
 const ALL_SIZES: WidgetSize[] = ['small', 'medium', 'full'];
 
@@ -106,6 +111,51 @@ export const WIDGET_REGISTRY: Record<DashboardWidgetId, WidgetDefinition> = {
     defaultVisible: true,
     supportedSizes: ALL_SIZES,
     component: QuickActionsWidget,
+  },
+  active_goals: {
+    id: 'active_goals',
+    title: 'Active Goals',
+    description: 'Overview of ongoing active goals and current progress',
+    defaultSize: 'medium',
+    defaultVisible: false,
+    supportedSizes: ALL_SIZES,
+    component: ActiveGoalsWidget,
+  },
+  upcoming_goal_deadlines: {
+    id: 'upcoming_goal_deadlines',
+    title: 'Upcoming Goal Deadlines',
+    description: 'Goals with deadlines due soon',
+    defaultSize: 'medium',
+    defaultVisible: false,
+    supportedSizes: ALL_SIZES,
+    component: UpcomingGoalDeadlinesWidget,
+  },
+  goal_progress_overview: {
+    id: 'goal_progress_overview',
+    title: 'Goal Progress Overview',
+    description: 'High-level completion and progress metrics across all goals',
+    defaultSize: 'medium',
+    defaultVisible: false,
+    supportedSizes: ALL_SIZES,
+    component: GoalProgressOverviewWidget,
+  },
+  recently_completed_goals: {
+    id: 'recently_completed_goals',
+    title: 'Recently Completed Goals',
+    description: 'Recently achieved milestones and completed goals',
+    defaultSize: 'medium',
+    defaultVisible: false,
+    supportedSizes: ALL_SIZES,
+    component: RecentlyCompletedGoalsWidget,
+  },
+  at_risk_goals: {
+    id: 'at_risk_goals',
+    title: 'At-Risk Goals',
+    description: 'Goals requiring immediate attention or falling behind schedule',
+    defaultSize: 'medium',
+    defaultVisible: false,
+    supportedSizes: ALL_SIZES,
+    component: AtRiskGoalsWidget,
   },
 };
 

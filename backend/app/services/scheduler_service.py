@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.reminder import Reminder, Notification, EmailDelivery, NotificationPreference
 from app.models.user import User
+from app.models.goal import Goal, GoalMilestone, PlanningObjective, GoalStatus, ProgressCalculationMethod
 from app.repositories.reminder_repository import ReminderRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.services.email_service import get_email_provider
@@ -210,3 +211,210 @@ class ReminderSchedulerService:
                 self.db.commit()
 
         return sent_count
+
+    def process_goal_notifications(self, current_time: Optional[datetime] = None) -> int:
+        """
+        Processes goal-related notifications:
+        - Upcoming goal deadlines (within 48h)
+        - Overdue goals
+        - Upcoming milestone deadlines (within 24h)
+        - Daily planning reminders
+        Deduplicates against existing notifications and respects user notification preferences & quiet hours.
+        """
+        if current_time is None:
+            current_time = datetime.now(timezone.utc)
+        elif current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=timezone.utc)
+
+        processed_count = 0
+        today_date = current_time.date()
+
+        # 1. Active goals
+        active_goals = (
+            self.db.query(Goal)
+            .filter(
+                Goal.is_archived.is_(False),
+                Goal.status.notin_([GoalStatus.COMPLETED.value, GoalStatus.CANCELLED.value]),
+                Goal.target_date.isnot(None),
+            )
+            .all()
+        )
+
+        for goal in active_goals:
+            try:
+                pref = self.notification_repo.get_preference(goal.user_id)
+                user = self.db.query(User).filter(User.id == goal.user_id).first()
+                if not user:
+                    continue
+
+                in_app_enabled = pref.in_app_enabled if pref else True
+                email_enabled = pref.email_enabled if pref else True
+                due_date_enabled = pref.due_date_reminders_enabled if pref else True
+                overdue_enabled = pref.overdue_reminders_enabled if pref else True
+                in_quiet = self.is_in_quiet_hours(pref, current_time)
+
+                days_to_target = (goal.target_date - today_date).days
+
+                # A. Overdue Goal Notification
+                if days_to_target < 0 and overdue_enabled:
+                    notif_type = "GOAL_OVERDUE"
+                    title = f"Goal Overdue: {goal.title}"
+                    # Check deduplication: notification for this specific goal_id, type & date
+                    # Stored in message or checked by unique title matching the goal title & ID
+                    existing = (
+                        self.db.query(Notification)
+                        .filter(
+                            Notification.user_id == goal.user_id,
+                            Notification.type == notif_type,
+                            Notification.title == title,
+                            Notification.message.like(f"%[{goal.id}]%"),
+                            Notification.created_at >= datetime.combine(today_date, time.min, tzinfo=timezone.utc),
+                        )
+                        .first()
+                    )
+                    if not existing:
+                        notification = None
+                        if in_app_enabled:
+                            notification = Notification(
+                                user_id=goal.user_id,
+                                title=title,
+                                message=f"Goal '{goal.title}' [{goal.id}] was due on {goal.target_date.isoformat()} and is currently at {goal.progress_percentage}% progress.",
+                                type=notif_type,
+                            )
+                            self.notification_repo.create(notification)
+
+                        if email_enabled and not in_quiet:
+                            email_delivery = EmailDelivery(
+                                user_id=goal.user_id,
+                                notification_id=notification.id if notification else None,
+                                recipient_email=user.email,
+                                subject=f"DayFlow Alert: {title}",
+                                body=f"Your goal '{goal.title}' [{goal.id}] is overdue (due {goal.target_date.isoformat()}). Current progress: {goal.progress_percentage}%.",
+                                status="PENDING",
+                                attempts=0,
+                                next_retry_at=current_time,
+                            )
+                            self.notification_repo.create_email_delivery(email_delivery)
+
+                        self.db.commit()
+                        processed_count += 1
+
+                # B. Approaching Goal Deadline Notification (within 2 days / 48 hours)
+                elif 0 <= days_to_target <= 2 and due_date_enabled:
+                    notif_type = "GOAL_DEADLINE"
+                    day_str = "today" if days_to_target == 0 else f"in {days_to_target} day{'s' if days_to_target > 1 else ''}"
+                    title = f"Goal Deadline Approaching: {goal.title}"
+                    existing = (
+                        self.db.query(Notification)
+                        .filter(
+                            Notification.user_id == goal.user_id,
+                            Notification.type == notif_type,
+                            Notification.title == title,
+                            Notification.message.like(f"%[{goal.id}]%"),
+                            Notification.created_at >= datetime.combine(today_date, time.min, tzinfo=timezone.utc),
+                        )
+                        .first()
+                    )
+                    if not existing:
+                        notification = None
+                        if in_app_enabled:
+                            notification = Notification(
+                                user_id=goal.user_id,
+                                title=title,
+                                message=f"Goal '{goal.title}' [{goal.id}] is due {day_str} ({goal.target_date.isoformat()}). Current progress: {goal.progress_percentage}%.",
+                                type=notif_type,
+                            )
+                            self.notification_repo.create(notification)
+
+                        if email_enabled and not in_quiet:
+                            email_delivery = EmailDelivery(
+                                user_id=goal.user_id,
+                                notification_id=notification.id if notification else None,
+                                recipient_email=user.email,
+                                subject=f"DayFlow Reminder: {title}",
+                                body=f"Your goal '{goal.title}' [{goal.id}] is due {day_str} ({goal.target_date.isoformat()}). Progress is currently at {goal.progress_percentage}%.",
+                                status="PENDING",
+                                attempts=0,
+                                next_retry_at=current_time,
+                            )
+                            self.notification_repo.create_email_delivery(email_delivery)
+
+                        self.db.commit()
+                        processed_count += 1
+
+            except Exception as e:
+                self.db.rollback()
+                logger.error("Error processing goal notification for goal %s: %s", goal.id, str(e), exc_info=True)
+
+        # 2. Approaching Milestone Deadlines (due within 1 day)
+        active_milestones = (
+            self.db.query(GoalMilestone)
+            .join(Goal, GoalMilestone.goal_id == Goal.id)
+            .filter(
+                Goal.is_archived.is_(False),
+                Goal.status.notin_([GoalStatus.COMPLETED.value, GoalStatus.CANCELLED.value]),
+                GoalMilestone.is_completed.is_(False),
+                GoalMilestone.due_date.isnot(None),
+            )
+            .all()
+        )
+
+        for ms in active_milestones:
+            try:
+                days_to_ms = (ms.due_date - today_date).days
+                if 0 <= days_to_ms <= 1:
+                    pref = self.notification_repo.get_preference(ms.goal.user_id)
+                    user = self.db.query(User).filter(User.id == ms.goal.user_id).first()
+                    if not user:
+                        continue
+
+                    in_app_enabled = pref.in_app_enabled if pref else True
+                    email_enabled = pref.email_enabled if pref else True
+                    due_date_enabled = pref.due_date_reminders_enabled if pref else True
+                    in_quiet = self.is_in_quiet_hours(pref, current_time)
+
+                    if due_date_enabled:
+                        notif_type = "MILESTONE_DUE"
+                        title = f"Milestone Due Soon: {ms.title}"
+                        existing = (
+                            self.db.query(Notification)
+                            .filter(
+                                Notification.user_id == ms.goal.user_id,
+                                Notification.type == notif_type,
+                                Notification.title == title,
+                                Notification.message.like(f"%[{ms.id}]%"),
+                                Notification.created_at >= datetime.combine(today_date, time.min, tzinfo=timezone.utc),
+                            )
+                            .first()
+                        )
+                        if not existing:
+                            notification = None
+                            if in_app_enabled:
+                                notification = Notification(
+                                    user_id=ms.goal.user_id,
+                                    title=title,
+                                    message=f"Milestone '{ms.title}' [{ms.id}] for goal '{ms.goal.title}' is due on {ms.due_date.isoformat()}.",
+                                    type=notif_type,
+                                )
+                                self.notification_repo.create(notification)
+
+                            if email_enabled and not in_quiet:
+                                email_delivery = EmailDelivery(
+                                    user_id=ms.goal.user_id,
+                                    notification_id=notification.id if notification else None,
+                                    recipient_email=user.email,
+                                    subject=f"DayFlow Milestone Alert: {title}",
+                                    body=f"Milestone '{ms.title}' [{ms.id}] for goal '{ms.goal.title}' is due on {ms.due_date.isoformat()}.",
+                                    status="PENDING",
+                                    attempts=0,
+                                    next_retry_at=current_time,
+                                )
+                                self.notification_repo.create_email_delivery(email_delivery)
+
+                            self.db.commit()
+                            processed_count += 1
+            except Exception as e:
+                self.db.rollback()
+                logger.error("Error processing milestone notification %s: %s", ms.id, str(e))
+
+        return processed_count
