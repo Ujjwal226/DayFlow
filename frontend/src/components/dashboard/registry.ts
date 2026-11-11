@@ -18,6 +18,8 @@ import { UpcomingGoalDeadlinesWidget } from './widgets/UpcomingGoalDeadlinesWidg
 import { GoalProgressOverviewWidget } from './widgets/GoalProgressOverviewWidget';
 import { RecentlyCompletedGoalsWidget } from './widgets/RecentlyCompletedGoalsWidget';
 import { AtRiskGoalsWidget } from './widgets/AtRiskGoalsWidget';
+import { FinanceNetWorthWidget } from './widgets/FinanceNetWorthWidget';
+import { FinanceCashFlowWidget } from './widgets/FinanceCashFlowWidget';
 
 const ALL_SIZES: WidgetSize[] = ['small', 'medium', 'full'];
 
@@ -156,6 +158,24 @@ export const WIDGET_REGISTRY: Record<DashboardWidgetId, WidgetDefinition> = {
     defaultVisible: false,
     supportedSizes: ALL_SIZES,
     component: AtRiskGoalsWidget,
+  },
+  finance_net_worth: {
+    id: 'finance_net_worth',
+    title: 'Total Net Worth',
+    description: 'Portfolio balance and asset/liability breakdown',
+    defaultSize: 'medium',
+    defaultVisible: true,
+    supportedSizes: ALL_SIZES,
+    component: FinanceNetWorthWidget,
+  },
+  finance_cash_flow: {
+    id: 'finance_cash_flow',
+    title: 'Monthly Cash Flow',
+    description: 'Current month income vs expense comparison',
+    defaultSize: 'medium',
+    defaultVisible: true,
+    supportedSizes: ALL_SIZES,
+    component: FinanceCashFlowWidget,
   },
 };
 

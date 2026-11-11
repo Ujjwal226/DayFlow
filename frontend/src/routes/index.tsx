@@ -23,6 +23,7 @@ import { NotificationsPage } from '../pages/NotificationsPage';
 import { NotificationPreferencesPage } from '../pages/NotificationPreferencesPage';
 import { FocusPage } from '../pages/FocusPage';
 import { GoalsPage } from '../pages/GoalsPage';
+import { FinancePage } from '../pages/finance/FinancePage';
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
 
 export const AppRoutes: React.FC = () => {
@@ -195,6 +196,14 @@ export const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <GoalsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/finance"
+        element={
+          <ProtectedRoute>
+            <FinancePage />
           </ProtectedRoute>
         }
       />

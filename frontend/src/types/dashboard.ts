@@ -17,7 +17,9 @@ export type DashboardWidgetId =
   | 'upcoming_goal_deadlines'
   | 'goal_progress_overview'
   | 'recently_completed_goals'
-  | 'at_risk_goals';
+  | 'at_risk_goals'
+  | 'finance_net_worth'
+  | 'finance_cash_flow';
 
 export interface DashboardWidgetConfig {
   widget_id: DashboardWidgetId | string;

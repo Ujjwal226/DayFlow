@@ -19,11 +19,13 @@ describe('Widget Registry', () => {
     'goal_progress_overview',
     'recently_completed_goals',
     'at_risk_goals',
+    'finance_net_worth',
+    'finance_cash_flow',
   ];
 
-  it('registers all fifteen expected widgets', () => {
+  it('registers all seventeen expected widgets', () => {
     const registeredIds = Object.keys(WIDGET_REGISTRY);
-    expect(registeredIds).toHaveLength(15);
+    expect(registeredIds).toHaveLength(17);
     for (const expectedId of expectedWidgetIds) {
       expect(registeredIds).toContain(expectedId);
     }

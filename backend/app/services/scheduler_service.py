@@ -9,9 +9,11 @@ from sqlalchemy.orm import Session
 from app.models.reminder import Reminder, Notification, EmailDelivery, NotificationPreference
 from app.models.user import User
 from app.models.goal import Goal, GoalMilestone, PlanningObjective, GoalStatus, ProgressCalculationMethod
+from app.models.finance import Budget
 from app.repositories.reminder_repository import ReminderRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.services.email_service import get_email_provider
+from app.services.finance_service import FinanceService
 
 logger = logging.getLogger("dayflow.scheduler")
 
@@ -155,7 +157,6 @@ class ReminderSchedulerService:
                 logger.error("Error processing due reminder %s: %s", reminder.id, str(e))
 
         return processed_count
-
     def process_pending_emails(self, current_time: Optional[datetime] = None) -> int:
         """Dispatches pending emails with exponential backoff, atomic locking, and error isolation."""
         if current_time is None:
@@ -416,5 +417,95 @@ class ReminderSchedulerService:
             except Exception as e:
                 self.db.rollback()
                 logger.error("Error processing milestone notification %s: %s", ms.id, str(e))
+
+        return processed_count
+    def process_recurring_financial_transactions(self) -> int:
+        """Processes due recurring financial transactions idempotently."""
+        try:
+            finance_service = FinanceService(self.db)
+            return finance_service.process_due_recurring_transactions()
+        except Exception as e:
+            self.db.rollback()
+            logger.error("Error processing recurring financial transactions: %s", str(e))
+            return 0
+
+    def process_budget_notifications(self, current_time: Optional[datetime] = None) -> int:
+        """Checks monthly budgets against 75%, 90%, 100% thresholds and creates alerts respecting quiet hours & user preferences."""
+        now_utc = current_time or datetime.now(timezone.utc)
+        today = now_utc.date()
+        year = today.year
+        month = today.month
+
+        budgets = self.db.query(Budget).filter(Budget.year == year, Budget.month == month).all()
+        processed_count = 0
+        finance_service = FinanceService(self.db)
+
+        for budget in budgets:
+            try:
+                spent = finance_service.repo.calculate_budget_spent(budget)
+                if budget.amount <= 0:
+                    continue
+
+                pct = (spent / budget.amount) * 100
+
+                # Check thresholds
+                threshold_to_alert = None
+                if pct >= 100 and not budget.alert_100_sent:
+                    threshold_to_alert = 100
+                elif pct >= 90 and not budget.alert_90_sent:
+                    threshold_to_alert = 90
+                elif pct >= 75 and not budget.alert_75_sent:
+                    threshold_to_alert = 75
+
+                if threshold_to_alert:
+                    user = self.db.query(User).filter(User.id == budget.user_id).first()
+                    if not user:
+                        continue
+
+                    pref = self.notification_repo.get_preference(user.id)
+                    in_quiet = self.is_in_quiet_hours(pref, now_utc)
+
+                    cat_name = budget.category.name if budget.category else "Overall"
+                    title = f"Budget Alert: {threshold_to_alert}% reached for {cat_name}"
+                    message = f"You have spent {budget.currency} {spent} of your {budget.currency} {budget.amount} budget for {cat_name} ({pct:.1f}%)."
+
+                    in_app_enabled = pref.in_app_enabled if pref else True
+                    email_enabled = pref.email_enabled if pref else True
+
+                    notification = None
+                    if in_app_enabled:
+                        notification = Notification(
+                            user_id=user.id,
+                            title=title,
+                            message=message,
+                            type="SYSTEM_ALERT",
+                        )
+                        self.notification_repo.create(notification)
+
+                    if email_enabled and not in_quiet:
+                        email_delivery = EmailDelivery(
+                            user_id=user.id,
+                            notification_id=notification.id if notification else None,
+                            recipient_email=user.email,
+                            subject=f"DayFlow Finance Alert: {title}",
+                            body=message,
+                            status="PENDING",
+                            attempts=0,
+                            next_retry_at=now_utc,
+                        )
+                        self.notification_repo.create_email_delivery(email_delivery)
+
+                    if threshold_to_alert == 100:
+                        budget.alert_100_sent = True
+                    elif threshold_to_alert == 90:
+                        budget.alert_90_sent = True
+                    elif threshold_to_alert == 75:
+                        budget.alert_75_sent = True
+
+                    self.db.commit()
+                    processed_count += 1
+            except Exception as e:
+                self.db.rollback()
+                logger.error("Error processing budget notification for budget %s: %s", budget.id, str(e))
 
         return processed_count

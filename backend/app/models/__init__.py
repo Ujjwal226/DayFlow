@@ -28,6 +28,24 @@ from app.models.goal import (
     PlanningObjective,
     GoalActivity,
 )
+from app.models.finance import (
+    FinancialAccount,
+    FinancialAccountType,
+    FinancialCategory,
+    FinancialCategoryType,
+    FinancialTag,
+    FinancialTransactionTag,
+    FinancialTransfer,
+    FinancialTransaction,
+    FinancialTransactionType,
+    Budget,
+    RecurringFinancialTransaction,
+    RecurringFrequency,
+    RecurringOccurrenceRecord,
+    FinancialSavingsGoal,
+    FinancialSavingsGoalEntry,
+    SavingsGoalStatus,
+)
 
 __all__ = [
     "ActivityAction",
